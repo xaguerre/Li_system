@@ -78,7 +78,7 @@ void fit_all_om_charge()
     for (int i = 0; i < 4; i++) {
       run_number = tab[i];
 
-      for(int om = 1; om<259; om+=2577)
+      for(int om = 258; om<259; om+=2577)
       {
         TH1D* spectre_om = spectre_charge(om, tab[i]);
         spectre_om->Draw();
@@ -180,7 +180,7 @@ void fit_all_om_charge()
   std::cout << comp << '\n';
   for (int i = 0; i < Result_tree.GetEntries(); i++) {
     Result_tree.GetEntry(i);
-    if (i_om == 1) {
+    if (i_om == 258) {
       comp_map.SetBinContent(i*19, mean_charge/comp*1.0);
       error = mean_error/comp*1.0 + (mean_charge/(comp*comp))*1.0*error1;
       std::cout << error << '\n';
@@ -252,7 +252,7 @@ void fit_LI()
       tree->SetBranchStatus("charge_tree",1);
       tree->SetBranchAddress("charge_tree", &charge_tree);
 
-      for(int om = 1; om<259; om+=259)
+      for(int om = 258; om<259; om+=259)
       {
         // for (double j = debut[i]; j < 250e9; j+=38e9)
         for (double j = debut[i]; j < debut[i]+6*38e9; j+=38e9)
@@ -264,7 +264,7 @@ void fit_LI()
           TF1 *f_Gaus = new TF1("f1", "[0]*TMath::Gaus(x,[1],[2])");
           f_Gaus->SetParNames("N_evt","mean_charge","Sigma");
 
-          if (om == 1)        //om multiple de (13)-1
+          if (om == 258)        //om multiple de (13)-1
           {
             f_Gaus->SetParameters(25, spectre->GetMean(1), 2100);
             f_Gaus->SetRange(0,300e9);
@@ -275,17 +275,6 @@ void fit_LI()
             f_Gaus->SetRange(f_Gaus->GetParameter(1)-2.5*f_Gaus->GetParameter(2),f_Gaus->GetParameter(1)+5*f_Gaus->GetParameter(2));
             spectre->Fit(f_Gaus, "RQ");
           }
-          // if (om == 258)        //om multiple de (13)-1
-          // {
-          //   f_Gaus->SetParameters(355, spectre->GetMean(1), 1400);
-          //   f_Gaus->SetRange(0,200000);
-          //   f_Gaus->Draw("same");
-          //   spectre->Fit(f_Gaus, "RQ");
-          //   f_Gaus->SetRange(f_Gaus->GetParameter(1)-2.5*f_Gaus->GetParameter(2),f_Gaus->GetParameter(1)+5*f_Gaus->GetParameter(2));
-          //   spectre->Fit(f_Gaus, "RQ");
-          //   f_Gaus->SetRange(f_Gaus->GetParameter(1)-2.5*f_Gaus->GetParameter(2),f_Gaus->GetParameter(1)+5*f_Gaus->GetParameter(2));
-          //   spectre->Fit(f_Gaus, "RQ");
-          // };
 
           i_om = om;
           constante = (f_Gaus->GetParameter(0));
@@ -319,62 +308,82 @@ void fit_LI()
       error1[i] = mean_error;
       std::cout << comp[i] << '\n';
     }
-    for (int i = 0; i < Result_tree.GetEntries(); i++) {
-      Result_tree.GetEntry(i);
-      if (i_om == 1) {
-        if ((i%6) == 0) {
-          comp_map_0.SetBinContent(i*19/6, mean/comp[0]*1.0);
-          std::cout << mean/comp[0]*1.0 << '\n';
-          error = mean_error/comp[0]*1.0 + (mean/(comp[0]*comp[0]))*1.0*error1[0];
-          comp_map_0.SetBinError(i*19/6,error);
-          comp_map_0.GetYaxis()->SetRangeUser(0.9, 1.1);
-        }
-        else if((i%6) == 1) {
-          comp_map_1.SetBinContent((i-1)*19/6, mean/comp[1]*1.0);
-          std::cout << mean/comp[1]*1.0 << '\n';
-          error = mean_error/comp[1]*1.0 + (mean/(comp[1]*comp[1]))*1.0*error1[1];
-          comp_map_1.SetBinError((i-1)*19/6,error);
-          comp_map_1.GetYaxis()->SetRangeUser(0.9, 1.1);
-        }
-        else if((i%6) == 2) {
-          comp_map_2.SetBinContent((i-2)*19/6, mean/comp[2]*1.0);
-          std::cout << mean/comp[2]*1.0 << '\n';
-          error = mean_error/comp[2]*1.0 + (mean/(comp[2]*comp[2]))*1.0*error1[2];
-          comp_map_2.SetBinError((i-2)*19/6,error);
-          comp_map_2.GetYaxis()->SetRangeUser(0.9, 1.1);
-        }
-        else if((i%6) == 3) {
-          comp_map_3.SetBinContent((i-3)*19/6, mean/comp[3]*1.0);
-          std::cout << mean/comp[3]*1.0 << '\n';
-          error = mean_error/comp[3]*1.0 + (mean/(comp[3]*comp[3]))*1.0*error1[3];
-          comp_map_3.SetBinError((i-3)*19/6,error);
-          comp_map_3.GetYaxis()->SetRangeUser(0.9, 1.1);
-        }
-        else if((i%6) == 4) {
-          comp_map_4.SetBinContent((i-4)*19/6, mean/comp[4]*1.0);
-          std::cout << mean/comp[4]*1.0 << '\n';
-          error = mean_error/comp[4]*1.0 + (mean/(comp[4]*comp[4]))*1.0*error1[4];
-          comp_map_4.SetBinError((i-4)*19/6,error);
-          comp_map_4.GetYaxis()->SetRangeUser(0.9, 1.1);
-        }
-        else if((i%6) == 5) {
-          comp_map_5.SetBinContent((i-5)*19/6, mean/comp[5]*1.0);
-          std::cout << mean/comp[5]*1.0 << '\n';
-          error = mean_error/comp[5]*1.0 + (mean/(comp[5]*comp[5]))*1.0*error1[5];
-          comp_map_5.SetBinError((i-5)*19/6,error);
-          comp_map_5.GetYaxis()->SetRangeUser(0.9, 1.1);
-        }
-      }
+
+
+    double test[4];
+    double testerror[4];
+    double xaxis[4] = {0, 19, 38, 57};
+    double xaxiserror[4] = {0.5, 0.5, 0.5, 0.5};
+
+    for (int i = 0; i < 4; i++) {
+      Result_tree.GetEntry(i*6);
+      test[i] = mean/comp[0]*1.0;
+      testerror[i] = mean_error/comp[0]*1.0 + (mean/(comp[0]*comp[0]))*1.0*error1[0];
     }
+    TGraphErrors gr (4, xaxis, test, xaxiserror, testerror);
+
+    gr.SetTitle("evolution du gain de l'OM 258");
+    gr.SetMarkerColor(4);
+    gr.SetMarkerStyle(21);
+    gr.Draw("pl");
+
+    // for (int i = 0; i < Result_tree.GetEntries(); i++) {
+    //   Result_tree.GetEntry(i);
+    //   if (i_om == 258) {
+    //     if ((i%6) == 0) {
+    //       comp_map_0.SetBinContent(i*19/6, mean/comp[0]*1.0);
+    //       std::cout << mean/comp[0]*1.0 << '\n';
+    //       error = mean_error/comp[0]*1.0 + (mean/(comp[0]*comp[0]))*1.0*error1[0];
+    //       comp_map_0.SetBinError(i*19/6,error);
+    //       comp_map_0.GetYaxis()->SetRangeUser(0.9, 1.1);
+    //     }
+    //     else if((i%6) == 1) {
+    //       comp_map_1.SetBinContent((i-1)*19/6, mean/comp[1]*1.0);
+    //       std::cout << mean/comp[1]*1.0 << '\n';
+    //       error = mean_error/comp[1]*1.0 + (mean/(comp[1]*comp[1]))*1.0*error1[1];
+    //       comp_map_1.SetBinError((i-1)*19/6,error);
+    //       comp_map_1.GetYaxis()->SetRangeUser(0.9, 1.1);
+    //     }
+    //     else if((i%6) == 2) {
+    //       comp_map_2.SetBinContent((i-2)*19/6, mean/comp[2]*1.0);
+    //       std::cout << mean/comp[2]*1.0 << '\n';
+    //       error = mean_error/comp[2]*1.0 + (mean/(comp[2]*comp[2]))*1.0*error1[2];
+    //       comp_map_2.SetBinError((i-2)*19/6,error);
+    //       comp_map_2.GetYaxis()->SetRangeUser(0.9, 1.1);
+    //     }
+    //     else if((i%6) == 3) {
+    //       comp_map_3.SetBinContent((i-3)*19/6, mean/comp[3]*1.0);
+    //       std::cout << mean/comp[3]*1.0 << '\n';
+    //       error = mean_error/comp[3]*1.0 + (mean/(comp[3]*comp[3]))*1.0*error1[3];
+    //       comp_map_3.SetBinError((i-3)*19/6,error);
+    //       comp_map_3.GetYaxis()->SetRangeUser(0.9, 1.1);
+    //     }
+    //     else if((i%6) == 4) {
+    //       comp_map_4.SetBinContent((i-4)*19/6, mean/comp[4]*1.0);
+    //       std::cout << mean/comp[4]*1.0 << '\n';
+    //       error = mean_error/comp[4]*1.0 + (mean/(comp[4]*comp[4]))*1.0*error1[4];
+    //       comp_map_4.SetBinError((i-4)*19/6,error);
+    //       comp_map_4.GetYaxis()->SetRangeUser(0.9, 1.1);
+    //     }
+    //     else if((i%6) == 5) {
+    //       comp_map_5.SetBinContent((i-5)*19/6, mean/comp[5]*1.0);
+    //       std::cout << mean/comp[5]*1.0 << '\n';
+    //       error = mean_error/comp[5]*1.0 + (mean/(comp[5]*comp[5]))*1.0*error1[5];
+    //       comp_map_5.SetBinError((i-5)*19/6,error);
+    //       comp_map_5.GetYaxis()->SetRangeUser(0.9, 1.1);
+    //     }
+    //   }
+    // }
 
     file.cd();
     mean_charge_map.Write();
-    comp_map_0.Write();
-    comp_map_1.Write();
-    comp_map_2.Write();
-    comp_map_3.Write();
-    comp_map_4.Write();
-    comp_map_5.Write();
+    gr.Write();
+    // comp_map_0.Write();
+    // comp_map_1.Write();
+    // comp_map_2.Write();
+    // comp_map_3.Write();
+    // comp_map_4.Write();
+    // comp_map_5.Write();
     Result_tree.Write();
     file.Close();
     return;
