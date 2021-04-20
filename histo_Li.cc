@@ -285,199 +285,6 @@ void fit_all_om_charge()
   return;
 }
 
-
-// void fit_all_om_charge()
-//   {
-//     gStyle->SetOptFit(1);
-//     gStyle->SetOptStat(0);
-//     TH1::SetDefaultSumw2();
-//     TH2::SetDefaultSumw2();
-//
-//     std::ofstream outFile("Resultats_charge.txt");
-//
-//     TFile file("Resultats_root/Resultat_charge.root","RECREATE");
-//
-//     int i_om;
-//     double n_evt;
-//     double mean_charge;
-//     double mean_error;
-//     double sigma;
-//     double  nbg;
-//     double lambda;
-//     int run_number;
-//     double error;
-//     double C = 0;
-//
-//     TTree Result_tree("Result_tree","");
-//     Result_tree.Branch("run_number", &run_number);
-//     Result_tree.Branch("i_om", &i_om);
-//     Result_tree.Branch("n_evt", &n_evt);
-//     Result_tree.Branch("mean_charge", &mean_charge);
-//     Result_tree.Branch("mean_error", &mean_error);
-//     Result_tree.Branch("sigma", &sigma);
-//     Result_tree.Branch("nbg", &nbg);
-//     int tab[4] = {547, 551, 554, 557};
-//
-//     TCanvas* canvas = new TCanvas;
-//     canvas->SetLogy();
-//
-//     TH2F mean_charge_map("histo_om_mean_charge_map", "mean_charge_map", 20, 0, 20, 13, 0, 13);
-//     for (int i = 0; i < 4; i++) {
-//       run_number = tab[i];
-//
-//       for(int om = 0; om<648; om+=1)
-//       {
-//         TH1D* spectre_om = spectre_charge(om, tab[i]);
-//         spectre_om->Draw();
-//         TF1* f_ComptonEdgePoly = new TF1 ("f_ComptonEdgePoly","[0]/2.0*(1+TMath::Erf(([1]-x)/(TMath::Sqrt(2)*[2])))+[3]*x + [4]", 40000, 90000);
-//         f_ComptonEdgePoly->SetParNames("N_evt","mean_charge","Sigma", "Nbg", "C" );
-//         if (om < 260){
-//           if ((om % 13) == 12 )        //om multiple de (13)-1
-//           {
-//             f_ComptonEdgePoly->SetParameters(120, 72367, 6893, 3.91e-5, 5);
-//             f_ComptonEdgePoly->SetRange(72000-2.5*6893,72000+2.5*6893);
-//             f_ComptonEdgePoly->Draw("same");
-//             spectre_om->Fit(f_ComptonEdgePoly, "RQ");
-//             f_ComptonEdgePoly->SetRange(f_ComptonEdgePoly->GetParameter(1)-2.5*f_ComptonEdgePoly->GetParameter(2),f_ComptonEdgePoly->GetParameter(1)+5*f_ComptonEdgePoly->GetParameter(2));
-//             spectre_om->Fit(f_ComptonEdgePoly, "RQ");
-//             f_ComptonEdgePoly->SetRange(f_ComptonEdgePoly->GetParameter(1)-2.5*f_ComptonEdgePoly->GetParameter(2),f_ComptonEdgePoly->GetParameter(1)+5*f_ComptonEdgePoly->GetParameter(2));
-//             spectre_om->Fit(f_ComptonEdgePoly, "RQ");
-//           }
-//           else if ((om % 13) == 0)       //om multiple de 13
-//           {
-//             f_ComptonEdgePoly->SetParameters(112, 68168, 5604, 1.2e-05, 5);
-//             f_ComptonEdgePoly->SetRange(68000-2.5*6893,68000+2.5*6893);
-//             f_ComptonEdgePoly->Draw("same");
-//             spectre_om->Fit(f_ComptonEdgePoly, "RQ");
-//             f_ComptonEdgePoly->SetRange(f_ComptonEdgePoly->GetParameter(1)-2.5*f_ComptonEdgePoly->GetParameter(2),f_ComptonEdgePoly->GetParameter(1)+5*f_ComptonEdgePoly->GetParameter(2));
-//             spectre_om->Fit(f_ComptonEdgePoly, "RQ");
-//             f_ComptonEdgePoly->SetRange(f_ComptonEdgePoly->GetParameter(1)-1.5*f_ComptonEdgePoly->GetParameter(2),f_ComptonEdgePoly->GetParameter(1)+5*f_ComptonEdgePoly->GetParameter(2));
-//             spectre_om->Fit(f_ComptonEdgePoly, "RQ");
-//           }
-//           else         //om normaux (8pouces)
-//           {
-//             f_ComptonEdgePoly->SetParameters(111, 60978, 3787, 4.19e-05, 5);
-//             f_ComptonEdgePoly->SetRange(45000,100000);
-//             f_ComptonEdgePoly->Draw("same");
-//             spectre_om->Fit(f_ComptonEdgePoly, "RQ");
-//             f_ComptonEdgePoly->SetRange(f_ComptonEdgePoly->GetParameter(1)-2.5*f_ComptonEdgePoly->GetParameter(2),f_ComptonEdgePoly->GetParameter(1)+7.5*f_ComptonEdgePoly->GetParameter(2));
-//             spectre_om->Fit(f_ComptonEdgePoly, "RQ");
-//             f_ComptonEdgePoly->SetRange(f_ComptonEdgePoly->GetParameter(1)-3.5*f_ComptonEdgePoly->GetParameter(2),f_ComptonEdgePoly->GetParameter(1)+7.5*f_ComptonEdgePoly->GetParameter(2));
-//             spectre_om->Fit(f_ComptonEdgePoly, "RQ");
-//           }
-//         }
-//         else if ((om < 520) && (om > 259)) {
-//           if ((om % 13) == 12 )        //om multiple de (13)-1
-//           {
-//             f_ComptonEdgePoly->SetParameters(120, 65000, 6893, 3.91e-5, 5);
-//             f_ComptonEdgePoly->SetRange(72000-2.5*6893,72000+2.5*6893);
-//             f_ComptonEdgePoly->Draw("same");
-//             spectre_om->Fit(f_ComptonEdgePoly, "RQ");
-//             f_ComptonEdgePoly->SetRange(f_ComptonEdgePoly->GetParameter(1)-2.5*f_ComptonEdgePoly->GetParameter(2),f_ComptonEdgePoly->GetParameter(1)+5*f_ComptonEdgePoly->GetParameter(2));
-//             spectre_om->Fit(f_ComptonEdgePoly, "RQ");
-//             f_ComptonEdgePoly->SetRange(f_ComptonEdgePoly->GetParameter(1)-2.5*f_ComptonEdgePoly->GetParameter(2),f_ComptonEdgePoly->GetParameter(1)+5*f_ComptonEdgePoly->GetParameter(2));
-//             spectre_om->Fit(f_ComptonEdgePoly, "RQ");
-//           }
-//           else if ((om % 13) == 0)       //om multiple de 13
-//           {
-//             f_ComptonEdgePoly->SetParameters(112, 68168, 5604, 1.2e-05, 5);
-//             f_ComptonEdgePoly->SetRange(68000-2.5*6893,68000+2.5*6893);
-//             f_ComptonEdgePoly->Draw("same");
-//             spectre_om->Fit(f_ComptonEdgePoly, "RQ");
-//             f_ComptonEdgePoly->SetRange(f_ComptonEdgePoly->GetParameter(1)-2.5*f_ComptonEdgePoly->GetParameter(2),f_ComptonEdgePoly->GetParameter(1)+5*f_ComptonEdgePoly->GetParameter(2));
-//             spectre_om->Fit(f_ComptonEdgePoly, "RQ");
-//             f_ComptonEdgePoly->SetRange(f_ComptonEdgePoly->GetParameter(1)-1.5*f_ComptonEdgePoly->GetParameter(2),f_ComptonEdgePoly->GetParameter(1)+5*f_ComptonEdgePoly->GetParameter(2));
-//             spectre_om->Fit(f_ComptonEdgePoly, "RQ");
-//           }
-//           else         //om normaux (8pouces)
-//           {
-//             f_ComptonEdgePoly->SetParameters(111, 65978, 3787, 4.19e-05, 5);
-//             f_ComptonEdgePoly->SetRange(50000,100000);
-//             f_ComptonEdgePoly->Draw("same");
-//             spectre_om->Fit(f_ComptonEdgePoly, "RQ");
-//             f_ComptonEdgePoly->SetRange(f_ComptonEdgePoly->GetParameter(1)-2.5*f_ComptonEdgePoly->GetParameter(2),f_ComptonEdgePoly->GetParameter(1)+7.5*f_ComptonEdgePoly->GetParameter(2));
-//             spectre_om->Fit(f_ComptonEdgePoly, "RQ");
-//             f_ComptonEdgePoly->SetRange(f_ComptonEdgePoly->GetParameter(1)-3.5*f_ComptonEdgePoly->GetParameter(2),f_ComptonEdgePoly->GetParameter(1)+7.5*f_ComptonEdgePoly->GetParameter(2));
-//             spectre_om->Fit(f_ComptonEdgePoly, "RQ");
-//           }
-//         }
-//         // if ((om < 648) && (om > 519)) {
-//         //   f_ComptonEdgePoly->SetParameters(30, 60000, 6893, 3.91e-6, 0);
-//         //   f_ComptonEdgePoly->SetRange(40000,65000+2.5*6893);
-//         //   f_ComptonEdgePoly->Draw("same");
-//         //   spectre_om->Fit(f_ComptonEdgePoly, "RQ");
-//         //   f_ComptonEdgePoly->SetRange(f_ComptonEdgePoly->GetParameter(1)-2.5*f_ComptonEdgePoly->GetParameter(2),f_ComptonEdgePoly->GetParameter(1)+5*f_ComptonEdgePoly->GetParameter(2));
-//         //   spectre_om->Fit(f_ComptonEdgePoly, "RQ");
-//         //   f_ComptonEdgePoly->SetRange(f_ComptonEdgePoly->GetParameter(1)-2.5*f_ComptonEdgePoly->GetParameter(2),f_ComptonEdgePoly->GetParameter(1)+5*f_ComptonEdgePoly->GetParameter(2));
-//         //   spectre_om->Fit(f_ComptonEdgePoly, "RQ");
-//         // }
-//
-//         i_om = om;
-//         n_evt = (f_ComptonEdgePoly->GetParameter(0));
-//         mean_charge = (f_ComptonEdgePoly->GetParameter(1));
-//         sigma = (f_ComptonEdgePoly->GetParameter(2));
-//         nbg = (f_ComptonEdgePoly->GetParameter(3));
-//         C = (f_ComptonEdgePoly->GetParameter(4));
-//         mean_error = f_ComptonEdgePoly->GetParError(1) ;
-//         //mapping
-//         int om_col = (om % 13 );
-//         int om_row = (om / 13);
-//         mean_charge_map.SetBinContent( om_row+1, om_col+1, mean_charge);
-//         Result_tree.Fill();
-//
-//         canvas->SaveAs(Form("fit/fit_Tl/charge_fit_om_%03d_run_%d.png", om, run_number));
-//
-//         outFile << tab[i] << "\t" << i_om << "\t" << n_evt << "\t" << mean_charge << "\t" << sigma << "\t"<< nbg << "\t" << C << endl;
-//
-//         delete spectre_om;
-//         delete f_ComptonEdgePoly;
-//       }
-//     }
-//     double comp[648];
-//
-//     for (int i = 0; i < 648; i++) {
-//       Result_tree.GetEntry(i);
-//       comp[i] = mean_charge;
-//       // error1[i] = mean_error;
-//     }
-//
-//   double yaxis;
-//   double yaxis_error[4];
-//   double xaxis[4] = {0, 19, 38, 57};
-//   double xaxiserror[4] = {0.5, 0.5, 0.5, 0.5};
-//       for (int j = 0; j < 648; j++){
-//         for (int i = 0; i < 4; i++) {
-//           int nombre = 648*i+j;
-//           Result_tree.GetEntry(nombre);
-//           yaxis = mean_charge/comp[j];
-//           // std::cout << "om = " << j << " and var = " << yaxis << '\n';
-//           if ((yaxis < 0.9) || (yaxis > 1.1)) {
-//
-//             std::cout << " run == " << tab[i] << " om = " << j << " and var = " << yaxis << '\n';
-//           }
-//         // yaxis_error[i] = mean_error/comp*1.0 + (mean_charge/(comp*comp))*1.0*error1;
-//       }
-//     }
-//   // TGraphErrors comp_map (4, xaxis, yaxis, xaxiserror, yaxis_error);
-//   //
-//   // comp_map.SetNameTitle("fit_Tl", "evolution du gain de l'OM 258");
-//   // comp_map.GetXaxis()->SetTitle("Temps (h)");
-//   // comp_map.GetYaxis()->SetTitle("Gain(t)/Gain(0)");
-//   // comp_map.SetMarkerColor(2);
-//   // comp_map.SetMarkerStyle(34);
-//   // comp_map.SetMarkerSize(2);
-//   //
-//   file.cd();
-//   // comp_map.Write();
-//   mean_charge_map.Write();
-//   Result_tree.Write();
-//
-//   file.Close();
-//   outFile.close();
-//
-//   return;
-// }
-
 void fit_LI(int amch)
   {
     gStyle->SetOptFit(1);
@@ -521,7 +328,7 @@ void fit_LI(int amch)
       int om_number;
       double time;
       double charge_tree;
-      double amplitude;
+      double amplitude_tree;
       TTree* tree = (TTree*)tree_file.Get("Result_tree");
       tree->SetBranchStatus("*",0);
       tree->SetBranchStatus("om_number",1);
@@ -530,8 +337,8 @@ void fit_LI(int amch)
       tree->SetBranchAddress("time", &time);
       tree->SetBranchStatus("charge_tree",1);
       tree->SetBranchAddress("charge_tree", &charge_tree);
-      tree->SetBranchStatus("amplitude",1);
-      tree->SetBranchAddress("amplitude", &amplitude);
+      tree->SetBranchStatus("amplitude_tree",1);
+      tree->SetBranchAddress("amplitude_tree", &amplitude_tree);
 
       for(int om = 33; om<259; om+=259)
       {
@@ -541,7 +348,7 @@ void fit_LI(int amch)
           TF1* f_ComptonEdgePoly = new TF1 ("f_ComptonEdgePoly","[0]/2.0*(1+TMath::Erf(([1]-x)/(TMath::Sqrt(2)*[2])))+[3]*x", 40000, 90000);
 
           if (amch == 0) {
-            tree->Draw("amplitude", Form("om_number == 1 && time < %f && time > %f", j, j-40e9));
+            tree->Draw("amplitude_tree", Form("om_number == 1 && time < %f && time > %f", j, j-40e9));
           }
           else{
             tree->Draw("charge_tree", Form("om_number == 1 && time < %f && time > %f", j, j-40e9));
