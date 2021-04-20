@@ -74,10 +74,10 @@ void Test(){
     canvas->SetLogy();
 
     TH2F mean_charge_map("histo_om_mean_charge_map", "mean_charge_map", 20, 0, 20, 13, 0, 13);
-    for (int i = 0; i <1; i++) {
+    for (int i = 1; i <2; i++) {
       run_number = tab[i];
 
-      for(int om = 22; om<648; om+=666)
+      for(int om = 81; om<648; om+=666)
       {
         TH1D* spectre_om = spectre_charge(om, tab[i]);
         spectre_om->Draw();
@@ -172,7 +172,7 @@ void fit_all_om_charge()
     Result_tree.Branch("sigma", &sigma);
     Result_tree.Branch("C", &C);
     Result_tree.Branch("nbg", &nbg);
-    //tree chi2
+    Result_tree.Branch("chi2", chi2)
     int tab[4] = {547, 551, 554, 557};
 
     int run_tab[712];
