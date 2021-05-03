@@ -335,6 +335,8 @@ void fit_LI_amplitude()
     TH2::SetDefaultSumw2();
 
     TFile file("Resultats_root/Resultat_amplitude_Li.root","RECREATE");
+    std::ofstream outFile("Resultats_txt/failed_fit.txt");
+    std::ofstream outFile2("Resultats_txt/failed_fit.txt");
 
     int i_om;
     double constante;
@@ -354,13 +356,13 @@ void fit_LI_amplitude()
     Result_tree.Branch("sigma", &sigma);
     Result_tree.Branch("count", &count);
 
-    double debut = 10;
+    double debut = 27.5;
 
     TCanvas* canvas = new TCanvas;
 
     TH1F comp_map("comp_map", "comp_map", 100, 0, 100);
 
-    TFile tree_file("histo_brut/histo_Li_system_549.root","READ");
+    TFile tree_file("histo_brut/histo_Li_system_565.root","READ");
     count++;
     int om_number;
     double time;
@@ -377,18 +379,27 @@ void fit_LI_amplitude()
     tree->SetBranchStatus("amplitude_tree",1);
     tree->SetBranchAddress("amplitude_tree", &amplitude_tree);
 
-    for(int om = 1; om<2; om+=1)
+    for(int om = 1; om < 712; om+=10)
     {
-      for (double j = debut+3*39.8; j < debut+4*39.8; j+=39.8)
+      for (double j = debut; j < debut+6*39.8; j+=39.8)
       {
         double temps = j;
-        if ((om > 259 && om < 520) || (om > 583 && om < 647) || (om > 679)) {temps+=(6*39.8+12.5);}
-        std::cout << "temps = " << temps << " and temps + 39.8 = " << temps+39.8 << '\n';
-        TH1D *spectre = new TH1D ("spectre_amplitude", "", 700, 0, 2700 );
+        if ((om > 259 && om < 520) || (om > 583 && om < 647) || (om > 679)) {temps+=(6*39.8+1*10);}
+        TH1D *spectre = new TH1D ("spectre_amplitude", "", 700, 0, 2300 );
         tree->Project("spectre_amplitude", "amplitude_tree", Form("om_number == %d && time > %f && time < %f && amplitude_tree > 10", om, temps, temps+39.8));
 
-        if (spectre->GetEntries() <100) {
+        if (spectre->GetEntries() < 100) {
+          std::cout << spectre->GetEntries() << '\n';
+          std::cout << "" << '\n';
           std::cout << "trop peu d'entries pour l'OM " << om << '\n';
+          std::cout << "" << '\n';
+          delete spectre;
+        }
+        else if (spectre->GetMean() > 1900) {
+          std::cout << "" << '\n';
+          std::cout << "the amplitude sature" << '\n';
+          std::cout << "" << '\n';
+          outFile2 << om << "\t" << temps << "\t" << temps+39.8 << endl;
           delete spectre;
         }
         else{
@@ -397,14 +408,16 @@ void fit_LI_amplitude()
           // f_Gaus->SetParameters(25, spectre->GetMean(), 100);
           f_Gaus->SetParameters(25, spectre->GetMean(), spectre->GetRMS());
           f_Gaus->SetRange(spectre->GetMean()-300, spectre->GetMean()+300);
-          std::cout << "mean = " << spectre->GetMean() << '\n';
           f_Gaus->Draw("same");
+          spectre->Fit(f_Gaus, "RQ0");
+          f_Gaus->SetRange(f_Gaus->GetParameter(1)-2.5*f_Gaus->GetParameter(2),f_Gaus->GetParameter(1)+5*f_Gaus->GetParameter(2));
+          spectre->Fit(f_Gaus, "RQ0");
+          f_Gaus->SetRange(f_Gaus->GetParameter(1)-2.5*f_Gaus->GetParameter(2),f_Gaus->GetParameter(1)+5*f_Gaus->GetParameter(2));
+          spectre->Fit(f_Gaus, "RQ0");
 
-          // spectre->Fit(f_Gaus, "RQ0");
-          // f_Gaus->SetRange(f_Gaus->GetParameter(1)-2.5*f_Gaus->GetParameter(2),f_Gaus->GetParameter(1)+5*f_Gaus->GetParameter(2));
-          // spectre->Fit(f_Gaus, "RQ0");
-          // f_Gaus->SetRange(f_Gaus->GetParameter(1)-2.5*f_Gaus->GetParameter(2),f_Gaus->GetParameter(1)+5*f_Gaus->GetParameter(2));
-          // spectre->Fit(f_Gaus, "RQ0");
+          if (f_Gaus->GetChisquare()/f_Gaus->GetNDF() > 2 || f_Gaus->GetChisquare()/f_Gaus->GetNDF() < 0.5) {
+            outFile << om << "\t" << temps << "\t" << temps+39.8 << endl;
+          }
 
           i_om = om;
           constante = (f_Gaus->GetParameter(0));
@@ -427,17 +440,18 @@ void fit_LI_amplitude()
     file.cd();
     Result_tree.Write();
     file.Close();
+    outFile.close();
     return;
   }
 
 void Li_bundle_variation()
 {
   TFile file("Resultats_root/Li_bundle_variation.root","RECREATE");
-  TFile tree_file("Resultats_root/Resultat_amplitude_Li.root","RECREATE");
+  TFile tree_file("Resultats_root/Resultat_amplitude_Li.root","READ");
 
   double mean;
   int i_om;
-  TTree* tree = (TTree*)tree_file.Get("Result_tree");
+  TTree* tree = (TTree*)tree_file.Get("Resultat_amplitude_Li");
   tree->SetBranchStatus("*",0);
   tree->SetBranchStatus("i_om",1);
   tree->SetBranchAddress("i_om", &i_om);
