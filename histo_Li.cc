@@ -31,6 +31,7 @@ using namespace std;
 
 TH1D* spectre_charge(int om_number, int file_number )
 {
+  cout << "COUCOU !!!" << endl;
     TFile *file = new TFile(Form("histo_brut/histo_charge_amplitude_energie_%i.root", file_number), "READ");
     gROOT->cd();
     TH2F* charge = (TH2F*)file->Get("histo_pm_charge");
@@ -343,18 +344,14 @@ void fit_LI_amplitude()
     double mean;
     double mean_error;
     double sigma;
-    int run_number;
     double error;
-    double count = -1;
 
     TTree Result_tree("Result_tree","");
-    Result_tree.Branch("run_number", &run_number);
     Result_tree.Branch("i_om", &i_om);
     Result_tree.Branch("constante", &constante);
     Result_tree.Branch("mean", &mean);
     Result_tree.Branch("mean_error", &mean_error);
     Result_tree.Branch("sigma", &sigma);
-    Result_tree.Branch("count", &count);
 
     double debut = 27.5;
 
@@ -363,7 +360,6 @@ void fit_LI_amplitude()
     TH1F comp_map("comp_map", "comp_map", 100, 0, 100);
 
     TFile tree_file("histo_brut/histo_Li_system_565.root","READ");
-    count++;
     int om_number;
     double time;
     double charge_tree;
@@ -379,9 +375,9 @@ void fit_LI_amplitude()
     tree->SetBranchStatus("amplitude_tree",1);
     tree->SetBranchAddress("amplitude_tree", &amplitude_tree);
 
-    for(int om = 1; om < 712; om+=10)
+    for(int om = 1; om < 712; om+=1)
     {
-      for (double j = debut; j < debut+6*39.8; j+=39.8)
+      for (double j = debut+3*39.8; j < debut+4*39.8; j+=39.8)
       {
         double temps = j;
         if ((om > 259 && om < 520) || (om > 583 && om < 647) || (om > 679)) {temps+=(6*39.8+1*10);}
@@ -430,7 +426,7 @@ void fit_LI_amplitude()
           Result_tree.Fill();
           spectre->Draw();
           f_Gaus->Draw("same");
-          canvas->SaveAs(Form("fit/fit_Li/amplitude_Li/OM_%03d_time_%.2f.png", om, temps));
+          canvas->SaveAs(Form("fit/fit_Li/amplitude_Li/OM_%03d_pic_%.0f.png", om, floor(temps/40)));
           delete spectre;
           delete f_Gaus;
         }
@@ -444,69 +440,69 @@ void fit_LI_amplitude()
     return;
   }
 
-void Li_bundle_variation()
+void Li_bundle_variation_old()
 {
   TFile file("Resultats_root/Li_bundle_variation.root","RECREATE");
   TFile tree_file("Resultats_root/Resultat_amplitude_Li.root","READ");
 
   double mean;
   int i_om;
-  TTree* tree = (TTree*)tree_file.Get("Resultat_amplitude_Li");
+  TTree* tree = (TTree*)tree_file.Get("Result_tree");
   tree->SetBranchStatus("*",0);
   tree->SetBranchStatus("i_om",1);
   tree->SetBranchAddress("i_om", &i_om);
   tree->SetBranchStatus("mean",1);
   tree->SetBranchAddress("mean", &mean);
 
-  TH1D *Li_bundle_1 = new TH1D ("Li_bundle_1", "", 2500, 0, 2500);
-  tree->Project("mean", "(i_om%13 > 7 && i_om/13 > 9 && i_om < 260) || (i_om > 663 && i_om < 672) || (i_om < 552 && i_om > 545) ||(i_om < 536 && i_om > 529) )");
+  TH1D *Li_bundle_1 = new TH1D ("Li_bundle_1", "", 1000, 0, 2500);
+  tree->Project("Li_bundle_1", "mean", "((i_om%13 > 7 && i_om/13 > 9 && i_om < 260) || (i_om > 663 && i_om < 672) || (i_om < 552 && i_om > 545) || (i_om < 536 && i_om > 529))");
   std::cout << "Li bundle 1 mean = " << Li_bundle_1->GetMean(1) << '\n';
-  tree->Scan("mean", "(mean/Li_bundle_1->GetMean(1) > 1.2 && mean/Li_bundle_1->GetMean(1) < 0.8 &&i_om%13 > 7 && i_om/13 > 9 && i_om < 260) || (i_om > 663 && i_om < 672) || (i_om < 552 && i_om > 545) ||(i_om < 536 && i_om > 529) )");
+  // tree->Scan("mean", "(mean/Li_bundle_1->GetMean(1) > 1.2 && mean/Li_bundle_1->GetMean(1) < 0.8 &&i_om%13 > 7 && i_om/13 > 9 && i_om < 260) || (i_om > 663 && i_om < 672) || (i_om < 552 && i_om > 545) ||(i_om < 536 && i_om > 529)");
 
-  TH1D *Li_bundle_2 = new TH1D ("Li_bundle_2", "", 2500, 0, 2500);
-  tree->Project("mean", "(i_om%13 < 7 && i_om/13 > 13 && i_om < 260) || (i_om > 652 && i_om < 647) || (i_om < 546 && i_om > 535) ||(i_om < 562 && i_om > 551) )");
+  TH1D *Li_bundle_2 = new TH1D ("Li_bundle_2", "", 1000, 0, 2500);
+  tree->Project("Li_bundle_2", "mean", "(i_om%13 < 7 && i_om/13 > 13 && i_om < 260) || (i_om < 652 && i_om > 647) || (i_om < 546 && i_om > 535) ||(i_om < 562 && i_om > 551)");
   std::cout << "Li bundle 2 mean = " << Li_bundle_2->GetMean(1) << '\n';
-  tree->Scan("mean", "(mean/Li_bundle_2->GetMean(1) > 1.2 && mean/Li_bundle_2->GetMean(1) < 0.8 &&i_om%13 > 7 && i_om/13 > 9 && i_om < 260) || (i_om > 663 && i_om < 672) || (i_om < 552 && i_om > 545) ||(i_om < 536 && i_om > 529) )");
-
-  TH1D *Li_bundle_3 = new TH1D ("Li_bundle_3", "", 2500, 0, 2500 );
-  tree->Project("mean", "(i_om%13 > 7 && i_om/13 < 10 && i_om < 260) || (i_om > 659 && i_om < 664) || (i_om < 578 && i_om > 567) ||(i_om < 530 && i_om > 519) )");
+  // tree->Scan("mean", "(mean/Li_bundle_2->GetMean(1) > 1.2 && mean/Li_bundle_2->GetMean(1) < 0.8 &&i_om%13 > 7 && i_om/13 > 9 && i_om < 260) || (i_om > 663 && i_om < 672) || (i_om < 552 && i_om > 545) ||(i_om < 536 && i_om > 529)");
+  //
+  TH1D *Li_bundle_3 = new TH1D ("Li_bundle_3", "", 1000, 0, 2500 );
+  tree->Project("Li_bundle_3", "mean", "(i_om%13 > 7 && i_om/13 < 10 && i_om < 260) || (i_om > 659 && i_om < 664) || (i_om < 578 && i_om > 567) || (i_om < 530 && i_om > 519)");
   std::cout << "Li bundle 3 mean = " << Li_bundle_3->GetMean(1) << '\n';
-  tree->Scan("mean", "(mean/Li_bundle_3->GetMean(1) > 1.2 && mean/Li_bundle_3->GetMean(1) < 0.8 &&i_om%13 > 7 && i_om/13 > 9 && i_om < 260) || (i_om > 663 && i_om < 672) || (i_om < 552 && i_om > 545) ||(i_om < 536 && i_om > 529) )");
-
-  TH1D *Li_bundle_4 = new TH1D ("Li_bundle_4", "", 2500, 0, 2500 );
-  tree->Project("mean", "(i_om%13 < 7 && i_om/13 > 5 && i_om < 14 && i_om < 260) || (i_om < 660 && i_om > 651) )");
+  // tree->Scan("mean", "(mean/Li_bundle_3->GetMean(1) > 1.2 && mean/Li_bundle_3->GetMean(1) < 0.8 &&i_om%13 > 7 && i_om/13 > 9 && i_om < 260) || (i_om > 663 && i_om < 672) || (i_om < 552 && i_om > 545) ||(i_om < 536 && i_om > 529)");
+  //
+  TH1D *Li_bundle_4 = new TH1D ("Li_bundle_4", "", 1000, 0, 2500 );
+  tree->Project("Li_bundle_4", "mean", "(i_om%13 < 7 && i_om/13 > 5 && i_om < 14 && i_om < 260) || (i_om < 660 && i_om > 651)");
   std::cout << "Li bundle 4 mean = " << Li_bundle_4->GetMean(1) << '\n';
-  tree->Scan("mean", "(mean/Li_bundle_4->GetMean(1) > 1.2 && mean/Li_bundle_4->GetMean(1) < 0.8 &&i_om%13 > 7 && i_om/13 > 9 && i_om < 260) || (i_om > 663 && i_om < 672) || (i_om < 552 && i_om > 545) ||(i_om < 536 && i_om > 529) )");
-
-  TH1D *Li_bundle_5 = new TH1D ("Li_bundle_5", "", 2500, 0, 2500 );
-  tree->Project("mean", "(i_om%13 < 7 && i_om/13 < 6 && i_om < 260) || (i_om > 659 && i_om < 664) || (i_om < 578 && i_om > 567) ||(i_om < 562 && i_om > 551) )");
+  // tree->Scan("mean", "(mean/Li_bundle_4->GetMean(1) > 1.2 && mean/Li_bundle_4->GetMean(1) < 0.8 &&i_om%13 > 7 && i_om/13 > 9 && i_om < 260) || (i_om > 663 && i_om < 672) || (i_om < 552 && i_om > 545) ||(i_om < 536 && i_om > 529)");
+  //
+  TH1D *Li_bundle_5 = new TH1D ("Li_bundle_5", "", 1000, 0, 2500 );
+  tree->Project("Li_bundle_5", "mean", "(i_om%13 < 7 && i_om/13 < 6 && i_om < 260) ||(i_om > 659 && i_om < 664) ||(i_om < 578 && i_om > 567) ||(i_om < 562 && i_om > 551)");
   std::cout << "Li bundle 5 mean = " << Li_bundle_5->GetMean(1) << '\n';
-  tree->Scan("mean", "(mean/Li_bundle_5->GetMean(1) > 1.2 && mean/Li_bundle_5->GetMean(1) < 0.8 &&i_om%13 > 7 && i_om/13 > 9 && i_om < 260) || (i_om > 663 && i_om < 672) || (i_om < 552 && i_om > 545) ||(i_om < 536 && i_om > 529) )");
+  // tree->Scan("mean", "(mean/Li_bundle_5->GetMean(1) > 1.2 && mean/Li_bundle_5->GetMean(1) < 0.8 &&i_om%13 > 7 && i_om/13 > 9 && i_om < 260) || (i_om > 663 && i_om < 672) || (i_om < 552 && i_om > 545) ||(i_om < 536 && i_om > 529)");
 
-  TH1D *Li_bundle_6 = new TH1D ("Li_bundle_6", "", 2500, 0, 2500 );
-  tree->Project("mean", "(i_om%13 > 7 && i_om/13 < 10 && i_om < 520 && i_om > 259) || (i_om > 695 && i_om < 704) || (i_om < 600 && i_om > 593) ||(i_om < 616 && i_om > 609) )");
+  TH1D *Li_bundle_6 = new TH1D ("Li_bundle_6", "", 1000, 0, 2500 );
+  tree->Project("Li_bundle_6", "mean", "(i_om%13 > 7 && i_om/13 < 10 && i_om < 520 && i_om > 259) ||(i_om > 695 && i_om < 704) ||(i_om < 600 && i_om > 593) ||(i_om < 616 && i_om > 609)");
   std::cout << "Li bundle 6 mean = " << Li_bundle_6->GetMean(1) << '\n';
-  tree->Scan("mean", "(mean/Li_bundle_6->GetMean(1) > 1.2 && mean/Li_bundle_6->GetMean(1) < 0.8 &&i_om%13 > 7 && i_om/13 > 9 && i_om < 260) || (i_om > 663 && i_om < 672) || (i_om < 552 && i_om > 545) ||(i_om < 536 && i_om > 529) )");
+  // tree->Scan("mean", "(mean/Li_bundle_6->GetMean(1) > 1.2 && mean/Li_bundle_6->GetMean(1) < 0.8 &&i_om%13 > 7 && i_om/13 > 9 && i_om < 260) || (i_om > 663 && i_om < 672) || (i_om < 552 && i_om > 545) ||(i_om < 536 && i_om > 529)");
 
-  TH1D *Li_bundle_7 = new TH1D ("Li_bundle_7", "", 2500, 0, 2500 );
-  tree->Project("mean", "(i_om%13 > 7 && i_om/13 > 9 && i_om < 520 && i_om > 259) || (i_om > 703 && i_om < 712) || (i_om < 648 && i_om > 641) ||(i_om < 632 && i_om > 625) )");
+  TH1D *Li_bundle_7 = new TH1D ("Li_bundle_7", "", 1000, 0, 2500 );
+  tree->Project("Li_bundle_7", "mean", "(i_om%13 > 7 && i_om/13 > 9 && i_om < 520 && i_om > 259) ||(i_om > 703 && i_om < 712) ||(i_om < 648 && i_om > 641) ||(i_om < 632 && i_om > 625)");
   std::cout << "Li bundle 7 mean = " << Li_bundle_7->GetMean(1) << '\n';
-  tree->Scan("mean", "(mean/Li_bundle_7->GetMean(1) > 1.2 && mean/Li_bundle_7->GetMean(1) < 0.8 &&i_om%13 > 7 && i_om/13 > 9 && i_om < 260) || (i_om > 663 && i_om < 672) || (i_om < 552 && i_om > 545) ||(i_om < 536 && i_om > 529) )");
+  // tree->Scan("mean", "(mean/Li_bundle_7->GetMean(1) > 1.2 && mean/Li_bundle_7->GetMean(1) < 0.8 &&i_om%13 > 7 && i_om/13 > 9 && i_om < 260) || (i_om > 663 && i_om < 672) || (i_om < 552 && i_om > 545) ||(i_om < 536 && i_om > 529)");
 
-  TH1D *Li_bundle_8 = new TH1D ("Li_bundle_8", "", 2500, 0, 2500 );
-  tree->Project("mean", "(i_om%13 < 7 && i_om/13 < 6 && i_om < 520 && i_om > 259) || (i_om > 679 && i_om < 684) || (i_om < 594 && i_om > 583) ||(i_om < 610 && i_om > 599) )");
+  TH1D *Li_bundle_8 = new TH1D ("Li_bundle_8", "", 1000, 0, 2500 );
+  tree->Project("Li_bundle_8", "mean", "(i_om%13 < 7 && i_om/13 < 6 && i_om < 520 && i_om > 259) ||(i_om > 679 && i_om < 684) ||(i_om < 594 && i_om > 583) ||(i_om < 610 && i_om > 599)");
   std::cout << "Li bundle 8 mean = " << Li_bundle_8->GetMean(1) << '\n';
-  tree->Scan("mean", "(mean/Li_bundle_8->GetMean(1) > 1.2 && mean/Li_bundle_8->GetMean(1) < 0.8 &&i_om%13 > 7 && i_om/13 > 9 && i_om < 260) || (i_om > 663 && i_om < 672) || (i_om < 552 && i_om > 545) ||(i_om < 536 && i_om > 529) )");
-
-  TH1D *Li_bundle_9 = new TH1D ("Li_bundle_9", "", 2500, 0, 2500 );
-  tree->Project("mean", "(i_om%13 < 7 && i_om/13 > 5 && i_om < 14 && i_om < 520 && i_om > 259) || (i_om > 683 && i_om < 691) )");
+  // tree->Scan("mean", "(mean/Li_bundle_8->GetMean(1) > 1.2 && mean/Li_bundle_8->GetMean(1) < 0.8 &&i_om%13 > 7 && i_om/13 > 9 && i_om < 260) || (i_om > 663 && i_om < 672) || (i_om < 552 && i_om > 545) ||(i_om < 536 && i_om > 529)");
+  //
+  TH1D *Li_bundle_9 = new TH1D ("Li_bundle_9", "", 1000, 0, 2500 );
+  tree->Project("Li_bundle_9", "mean", "(i_om%13 < 7 && i_om/13 > 5 && i_om < 14 && i_om < 520 && i_om > 259) ||(i_om > 683 && i_om < 691)");
   std::cout << "Li bundle 9 mean = " << Li_bundle_9->GetMean(1) << '\n';
-  tree->Scan("mean", "(mean/Li_bundle_9->GetMean(1) > 1.2 && mean/Li_bundle_9->GetMean(1) < 0.8 &&i_om%13 > 7 && i_om/13 > 9 && i_om < 260) || (i_om > 663 && i_om < 672) || (i_om < 552 && i_om > 545) ||(i_om < 536 && i_om > 529) )");
+  // tree->Scan("mean", "(mean/Li_bundle_9->GetMean(1) > 1.2 && mean/Li_bundle_9->GetMean(1) < 0.8 &&i_om%13 > 7 && i_om/13 > 9 && i_om < 260) || (i_om > 663 && i_om < 672) || (i_om < 552 && i_om > 545) ||(i_om < 536 && i_om > 529)");
 
-  TH1D *Li_bundle_10 = new TH1D ("Li_bundle_10", "", 2500, 0, 2500 );
-  tree->Project("mean", "(i_om%13 < 7 && i_om/13 >13 && i_om < 520 && i_om > 259) || (i_om > 691 && i_om < 696) || (i_om < 642 && i_om > 631) ||(i_om < 626 && i_om > 615) )");
+  TH1D *Li_bundle_10 = new TH1D ("Li_bundle_10", "", 1000, 0, 2500 );
+  tree->Project("Li_bundle_10", "mean", "(i_om%13 < 7 && i_om/13 >13 && i_om < 520 && i_om > 259) ||(i_om > 691 && i_om < 696) ||(i_om < 642 && i_om > 631) ||(i_om < 626 && i_om > 615)");
   std::cout << "Li bundle 10 mean = " << Li_bundle_10->GetMean(1) << '\n';
-  tree->Scan("mean", "(mean/Li_bundle_10->GetMean(1) > 1.2 && mean/Li_bundle_10->GetMean(1) < 0.8 &&i_om%13 > 7 && i_om/13 > 9 && i_om < 260) || (i_om > 663 && i_om < 672) || (i_om < 552 && i_om > 545) ||(i_om < 536 && i_om > 529) )");
+  // tree->Scan("mean", "(mean/Li_bundle_10->GetMean(1) > 1.2 && mean/Li_bundle_10->GetMean(1) < 0.8 &&i_om%13 > 7 && i_om/13 > 9 && i_om < 260) || (i_om > 663 && i_om < 672) || (i_om < 552 && i_om > 545) ||(i_om < 536 && i_om > 529)");
 
   file.cd();
   Li_bundle_1->Write();
@@ -522,6 +518,132 @@ void Li_bundle_variation()
   file.Close();
 }
 
+
+int bundle_number(int i_om)
+{
+  int bundle_number = 0;
+  if ((i_om%13 > 7 && i_om/13 < 10 && i_om < 260) || (i_om > 663 && i_om < 672) || (i_om < 552 && i_om > 545) || (i_om < 536 && i_om > 529)) {
+    bundle_number = 1;
+  }
+  else if ((i_om%13 < 7 && i_om/13 < 6 && i_om < 260) ||(i_om > 647 && i_om < 652) ||(i_om < 546 && i_om > 535) ||(i_om < 530 && i_om > 519)){
+    bundle_number = 2;
+  }
+  if ((i_om%13 > 7 && i_om/13 > 9 && i_om < 260) || (i_om > 671 && i_om < 678) || (i_om < 568 && i_om > 561) || (i_om < 584 && i_om > 577)) {
+    bundle_number = 3;
+  }
+  else if ((i_om%13 < 7 && i_om/13 > 5 && i_om/13 < 14 && i_om < 260) || (i_om < 660 && i_om > 651)) {
+    bundle_number = 4;
+  }
+  else if ((i_om%13 < 7 && i_om/13 > 13 && i_om < 260) || (i_om < 664 && i_om > 659) || (i_om < 562 && i_om > 551) ||(i_om < 578 && i_om > 567)) {
+    bundle_number = 5;
+  }
+  else if ((i_om%13 > 7 && (i_om/13-20) < 10 && i_om < 520 && i_om > 259) ||(i_om > 695 && i_om < 704) ||(i_om < 600 && i_om > 593) ||(i_om < 616 && i_om > 609)){
+    bundle_number = 6;
+  }
+  else if ((i_om%13 > 7 && (i_om/13-20) > 9 && i_om < 520 && i_om > 259) ||(i_om > 703 && i_om < 712) ||(i_om < 648 && i_om > 641) ||(i_om < 632 && i_om > 625)){
+    bundle_number = 7;
+  }
+  else if ((i_om%13 < 7 && (i_om/13-20) < 6 && i_om < 520 && i_om > 259) ||(i_om > 679 && i_om < 684) ||(i_om < 594 && i_om > 583) ||(i_om < 610 && i_om > 599)){
+    bundle_number = 8;
+  }
+  else if ((i_om%13 < 7 && (i_om/13-20) > 5 && (i_om/13-20) < 14 && i_om < 520 && i_om > 259) ||(i_om > 683 && i_om < 691)){
+    bundle_number = 9;
+  }
+  else if ((i_om%13 < 7 && (i_om/13-20) > 13 && i_om < 520 && i_om > 259) ||(i_om > 691 && i_om < 696) ||(i_om < 642 && i_om > 631) ||(i_om < 626 && i_om > 615)){
+    bundle_number = 10;
+  }
+  return bundle_number;
+}
+
+void Li_bundle_variation_new()
+{
+  TFile file("Resultats_root/Li_bundle_variation.root","RECREATE");
+  TFile tree_file("Resultats_root/Resultat_amplitude_Li.root","READ");
+
+  double mean;
+  int i_om;
+  TTree* tree = (TTree*)tree_file.Get("Result_tree");
+  tree->SetBranchStatus("*",0);
+  tree->SetBranchStatus("i_om",1);
+  tree->SetBranchAddress("i_om", &i_om);
+  tree->SetBranchStatus("mean",1);
+  tree->SetBranchAddress("mean", &mean);
+
+  TH1D *Li_bundle_1 = new TH1D ("Li_bundle_1", "", 1000, 0, 2500);
+  for (int i = 0; i < tree->GetEntries(); i++) {
+    tree->GetEntry(i);
+
+    if ((i_om%13 > 7 && i_om/13 > 9 && i_om < 260) || (i_om > 663 && i_om < 672) || (i_om < 552 && i_om > 545) || (i_om < 536 && i_om > 529))
+    {
+      Li_bundle_1->Fill(mean);
+    }
+
+
+
+  }
+
+  // tree->Project("Li_bundle_1", "mean >> (1000,0,2500)", "((i_om%13 > 7 && i_om/13 > 9 && i_om < 260) || (i_om > 663 && i_om < 672) || (i_om < 552 && i_om > 545) || (i_om < 536 && i_om > 529))");
+  // std::cout << "Li bundle 1 mean = " << Li_bundle_1->GetMean(1) << '\n';
+  // tree->Scan("mean", "(mean/Li_bundle_1->GetMean(1) > 1.2 && mean/Li_bundle_1->GetMean(1) < 0.8 &&i_om%13 > 7 && i_om/13 > 9 && i_om < 260) || (i_om > 663 && i_om < 672) || (i_om < 552 && i_om > 545) ||(i_om < 536 && i_om > 529)");
+  //
+  // TH1D *Li_bundle_2 = new TH1D ("Li_bundle_2", "", 1000, 0, 2500);
+  // tree->Project("Li_bundle_2", "mean>>(1000,0,2500)", "(i_om%13 < 7 && i_om/13 > 13 && i_om < 260) || (i_om > 652 && i_om < 647) || (i_om < 546 && i_om > 535) ||(i_om < 562 && i_om > 551)");
+  // std::cout << "Li bundle 2 mean = " << Li_bundle_2->GetMean(1) << '\n';
+  // tree->Scan("mean", "(mean/Li_bundle_2->GetMean(1) > 1.2 && mean/Li_bundle_2->GetMean(1) < 0.8 &&i_om%13 > 7 && i_om/13 > 9 && i_om < 260) || (i_om > 663 && i_om < 672) || (i_om < 552 && i_om > 545) ||(i_om < 536 && i_om > 529)");
+  //
+  // TH1D *Li_bundle_3 = new TH1D ("Li_bundle_3", "", 1000, 0, 2500 );
+  // tree->Project("Li_bundle_3", "mean>>(1000,0,2500)", "(i_om%13 > 7 && i_om/13 < 10 && i_om < 260) || (i_om > 659 && i_om < 664) || (i_om < 578 && i_om > 567) ||(i_om < 530 && i_om > 519)");
+  // std::cout << "Li bundle 3 mean = " << Li_bundle_3->GetMean(1) << '\n';
+  // tree->Scan("mean", "(mean/Li_bundle_3->GetMean(1) > 1.2 && mean/Li_bundle_3->GetMean(1) < 0.8 &&i_om%13 > 7 && i_om/13 > 9 && i_om < 260) || (i_om > 663 && i_om < 672) || (i_om < 552 && i_om > 545) ||(i_om < 536 && i_om > 529)");
+  //
+  // TH1D *Li_bundle_4 = new TH1D ("Li_bundle_4", "", 1000, 0, 2500 );
+  // tree->Project("Li_bundle_4", "mean>>(1000,0,2500)", "(i_om%13 < 7 && i_om/13 > 5 && i_om < 14 && i_om < 260) || (i_om < 660 && i_om > 651)");
+  // std::cout << "Li bundle 4 mean = " << Li_bundle_4->GetMean(1) << '\n';
+  // tree->Scan("mean", "(mean/Li_bundle_4->GetMean(1) > 1.2 && mean/Li_bundle_4->GetMean(1) < 0.8 &&i_om%13 > 7 && i_om/13 > 9 && i_om < 260) || (i_om > 663 && i_om < 672) || (i_om < 552 && i_om > 545) ||(i_om < 536 && i_om > 529)");
+  //
+  // TH1D *Li_bundle_5 = new TH1D ("Li_bundle_5", "", 1000, 0, 2500 );
+  // tree->Project("Li_bundle_5", "mean>>(1000,0,2500)", "(i_om%13 < 7 && i_om/13 < 6 && i_om < 260) || (i_om > 659 && i_om < 664) || (i_om < 578 && i_om > 567) ||(i_om < 562 && i_om > 551)");
+  // std::cout << "Li bundle 5 mean = " << Li_bundle_5->GetMean(1) << '\n';
+  // tree->Scan("mean", "(mean/Li_bundle_5->GetMean(1) > 1.2 && mean/Li_bundle_5->GetMean(1) < 0.8 &&i_om%13 > 7 && i_om/13 > 9 && i_om < 260) || (i_om > 663 && i_om < 672) || (i_om < 552 && i_om > 545) ||(i_om < 536 && i_om > 529)");
+  //
+  // TH1D *Li_bundle_6 = new TH1D ("Li_bundle_6", "", 1000, 0, 2500 );
+  // tree->Project("Li_bundle_6", "mean>>(1000,0,2500)", "(i_om%13 > 7 && i_om/13 < 10 && i_om < 520 && i_om > 259) || (i_om > 695 && i_om < 704) || (i_om < 600 && i_om > 593) ||(i_om < 616 && i_om > 609)");
+  // std::cout << "Li bundle 6 mean = " << Li_bundle_6->GetMean(1) << '\n';
+  // tree->Scan("mean", "(mean/Li_bundle_6->GetMean(1) > 1.2 && mean/Li_bundle_6->GetMean(1) < 0.8 &&i_om%13 > 7 && i_om/13 > 9 && i_om < 260) || (i_om > 663 && i_om < 672) || (i_om < 552 && i_om > 545) ||(i_om < 536 && i_om > 529)");
+  //
+  // TH1D *Li_bundle_7 = new TH1D ("Li_bundle_7", "", 1000, 0, 2500 );
+  // tree->Project("Li_bundle_7", "mean>>(1000,0,2500)", "(i_om%13 > 7 && i_om/13 > 9 && i_om < 520 && i_om > 259) || (i_om > 703 && i_om < 712) || (i_om < 648 && i_om > 641) ||(i_om < 632 && i_om > 625) ");
+  // std::cout << "Li bundle 7 mean = " << Li_bundle_7->GetMean(1) << '\n';
+  // tree->Scan("mean", "(mean/Li_bundle_7->GetMean(1) > 1.2 && mean/Li_bundle_7->GetMean(1) < 0.8 &&i_om%13 > 7 && i_om/13 > 9 && i_om < 260) || (i_om > 663 && i_om < 672) || (i_om < 552 && i_om > 545) ||(i_om < 536 && i_om > 529)");
+  //
+  // TH1D *Li_bundle_8 = new TH1D ("Li_bundle_8", "", 1000, 0, 2500 );
+  // tree->Project("Li_bundle_8", "mean>>(1000,0,2500)", "(i_om%13 < 7 && i_om/13 < 6 && i_om < 520 && i_om > 259) || (i_om > 679 && i_om < 684) || (i_om < 594 && i_om > 583) ||(i_om < 610 && i_om > 599)");
+  // std::cout << "Li bundle 8 mean = " << Li_bundle_8->GetMean(1) << '\n';
+  // tree->Scan("mean", "(mean/Li_bundle_8->GetMean(1) > 1.2 && mean/Li_bundle_8->GetMean(1) < 0.8 &&i_om%13 > 7 && i_om/13 > 9 && i_om < 260) || (i_om > 663 && i_om < 672) || (i_om < 552 && i_om > 545) ||(i_om < 536 && i_om > 529)");
+  //
+  // TH1D *Li_bundle_9 = new TH1D ("Li_bundle_9", "", 1000, 0, 2500 );
+  // tree->Project("Li_bundle_9", "mean>>(1000,0,2500)", "(i_om%13 < 7 && i_om/13 > 5 && i_om < 14 && i_om < 520 && i_om > 259) || (i_om > 683 && i_om < 691)");
+  // std::cout << "Li bundle 9 mean = " << Li_bundle_9->GetMean(1) << '\n';
+  // tree->Scan("mean", "(mean/Li_bundle_9->GetMean(1) > 1.2 && mean/Li_bundle_9->GetMean(1) < 0.8 &&i_om%13 > 7 && i_om/13 > 9 && i_om < 260) || (i_om > 663 && i_om < 672) || (i_om < 552 && i_om > 545) ||(i_om < 536 && i_om > 529)");
+  //
+  // TH1D *Li_bundle_10 = new TH1D ("Li_bundle_10", "", 1000, 0, 2500 );
+  // tree->Project("Li_bundle_10", "mean>>(1000,0,2500)", "(i_om%13 < 7 && i_om/13 >13 && i_om < 520 && i_om > 259) || (i_om > 691 && i_om < 696) || (i_om < 642 && i_om > 631) ||(i_om < 626 && i_om > 615)");
+  // std::cout << "Li bundle 10 mean = " << Li_bundle_10->GetMean(1) << '\n';
+  // tree->Scan("mean", "(mean/Li_bundle_10->GetMean(1) > 1.2 && mean/Li_bundle_10->GetMean(1) < 0.8 &&i_om%13 > 7 && i_om/13 > 9 && i_om < 260) || (i_om > 663 && i_om < 672) || (i_om < 552 && i_om > 545) ||(i_om < 536 && i_om > 529)");
+
+  file.cd();
+  Li_bundle_1->Write();
+  // Li_bundle_2->Write();
+  // Li_bundle_3->Write();
+  // Li_bundle_4->Write();
+  // Li_bundle_5->Write();
+  // Li_bundle_6->Write();
+  // Li_bundle_7->Write();
+  // Li_bundle_8->Write();
+  // Li_bundle_9->Write();
+  // Li_bundle_10->Write();
+  file.Close();
+}
 
 // void variation_Li() {
 //   gStyle->SetOptFit(1);
