@@ -33,6 +33,7 @@
 #include <TLatex.h>
 #include <TRandom3.h>
 #include <TLegend.h>
+#include <boost/filesystem.hpp>
 using namespace std;
 
 
@@ -315,7 +316,7 @@ int intensity_chooser(int pic){
   return intensity;
 }
 
-void fit_LI_amplitude(int run_number){
+void fit_LI_amplitude(int run_number, int time2 = 0){
   gStyle->SetOptFit(1);
   gStyle->SetOptStat(0);
   TH1::SetDefaultSumw2();
@@ -326,7 +327,7 @@ void fit_LI_amplitude(int run_number){
 
   int i_om;
   double constante;
-  double mean;
+  double mean, time;
   double mean_error;
   double sigma;
   int pic =0;
@@ -338,18 +339,18 @@ void fit_LI_amplitude(int run_number){
   Result_tree.Branch("pic", &pic);
   Result_tree.Branch("Khi2", &Khi2);
   Result_tree.Branch("constante", &constante);
-  Result_tree.Branch("mean", &mean);
-  Result_tree.Branch("mean_error", &mean_error);
+  Result_tree.Branch("Amplitude", &mean);
+  Result_tree.Branch("Amplitude_error", &mean_error);
   Result_tree.Branch("sigma", &sigma);
   Result_tree.Branch("run_number", &run_number);
   Result_tree.Branch("intensity", &intensity);
+  Result_tree.Branch("time", &time2);
 
-  double debut = 17;
+  double debut = 0;
   TCanvas* canvas = new TCanvas;
   TH1F comp_map("comp_map", "comp_map", 100, 0, 100);
   TFile tree_file(Form("histo_brut/histo_Li_system_%d.root", run_number), "READ");
   int om_number;
-  double time;
   double charge_tree;
   double amplitude_tree;
   TTree* tree = (TTree*)tree_file.Get("Result_tree");
@@ -362,13 +363,29 @@ void fit_LI_amplitude(int run_number){
   tree->SetBranchAddress("charge_tree", &charge_tree);
   tree->SetBranchStatus("amplitude_tree",1);
   tree->SetBranchAddress("amplitude_tree", &amplitude_tree);
+  int n_evt = 0;
+  while (n_evt < 100) {
+    TH1D *spectre = new TH1D ("spectre_amplitude", "", 700, 0, 2300);
+    tree->Project("spectre_amplitude", "amplitude_tree", Form("om_number == 1 && time < %f  && amplitude_tree > 10", debut));
+    debut++;
 
-  for(int om = 0; om < 712; om+=1)
+    n_evt = spectre->GetEntries();
+    // std::cout << "n_evt = " << n_evt << " debut = " << debut << '\n';
+    delete spectre;
+  }
+
+  std::cout << "debut = " << debut << '\n';
+
+
+  for(int om = 800; om < 805; om+=1)
   {
+    if (om ==712) {
+      om = 800;
+    }
     for (double j = debut; j < debut+6*40.5; j = j+40.5)
     {
       double temps = j;
-      if ((om > 259 && om < 520) || (om > 583 && om < 647) || (om > 679)) {temps=(265+j-debut);}
+      if ((om > 259 && om < 520) || (om > 583 && om < 647) || (om > 679) ) {temps=(265+j-debut);}
       TH1D *spectre = new TH1D ("spectre_amplitude", "", 700, 0, 2300 );
       tree->Project("spectre_amplitude", "amplitude_tree", Form("om_number == %d && time > %f && time < %f && amplitude_tree > 10", om, temps, ceil(temps+32.5)));
       std::cout << "temps = " << temps << " - " << ceil(temps+32.5) << '\n';
@@ -431,80 +448,6 @@ void fit_LI_amplitude(int run_number){
   return;
 }
 
-// void amplitude_variation(std::vector<int> run_number) {
-//
-//   int om_number;
-//   double time;
-//   double charge;
-//   double amplitude;
-//
-//   for (int i = 0; i < run_number.size(); i++) {
-//
-//
-//
-//     TFile fit_file(Form("Resultats_root/Amplitude_Li_run_%d.root", run_number[1]),"READ");
-//     TTree* tree = (TTree*)fit_file.Get("Result_tree");
-//     tree->SetBranchStatus("*",0);
-//     tree->SetBranchStatus("om_number",1);
-//     tree->SetBranchAddress("om_number", &om_number);
-//     tree->SetBranchStatus("time",1);
-//     tree->SetBranchAddress("time", &time);
-//     tree->SetBranchStatus("charge_tree",1);
-//     tree->SetBranchAddress("charge_tree", &charge);
-//     tree->SetBranchStatus("amplitude_tree",1);
-//     tree->SetBranchAddress("amplitude_tree", &amplitude);
-//   }
-//
-//
-//     double comp[520];
-//
-//     for (int i = 0; i < 520; i++) {
-//       Result_tree.GetEntry(i);
-//       comp[i] = mean_charge;
-//       // error1[i] = mean_error;
-//     }
-//
-//   double yaxis;
-//   double yaxis_error[4];
-//   double xaxis[4] = {0, 19, 38, 57};
-//   double xaxiserror[4] = {0.5, 0.5, 0.5, 0.5};
-//       for (int j = 0; j < 520; j++){
-//         for (int i = 0; i < 4; i++) {
-//           int nombre = 520*i+j;
-//           Result_tree.GetEntry(nombre);
-//           yaxis = mean_charge/comp[j];
-//           // std::cout << "om = " << j << " and var = " << yaxis << '\n';
-//           if ((yaxis < 0.9) || (yaxis > 1.1)) {
-//
-//             std::cout << " run == " << tab[i] << " om = " << j << " and var = " << yaxis << '\n';
-//           }
-//         // yaxis_error[i] = mean_error/comp*1.0 + (mean_charge/(comp*comp))*1.0*error1;
-//       }
-//     }
-//   TGraphErrors comp_map (4, xaxis, yaxis, xaxiserror, yaxis_error);
-//
-//   comp_map.SetNameTitle("fit_Tl", "evolution du gain de l'OM 258");
-//   comp_map.GetXaxis()->SetTitle("Temps (h)");
-//   comp_map.GetYaxis()->SetTitle("Gain(t)/Gain(0)");
-//   comp_map.SetMarkerColor(2);
-//   comp_map.SetMarkerStyle(34);
-//   comp_map.SetMarkerSize(2);
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-// }
-
-
-
-
 int bundle_number(int i_om){
   int bundle_number = 0;
   if ((i_om%13 > 7 && i_om/13 < 10 && i_om < 260) || (i_om > 663 && i_om < 672) || (i_om < 552 && i_om > 545) || (i_om < 536 && i_om > 529)) {
@@ -540,12 +483,12 @@ int bundle_number(int i_om){
   return bundle_number;
 }
 
-void fit_ref(int run_number) {
+void fit_ref(int run_number, int time2 = 0) {
   gStyle->SetOptFit(1);
   gStyle->SetOptStat(1);
-  TFile newfile("Resultats_root/fit_ref.root","RECREATE");
+  TFile newfile(Form("Resultats_root/fit_ref_run_%d.root", run_number),"RECREATE");
   int om_number;
-  double p0, p1, p2, p3, p4, p5, p6;
+  double p0, p1, p2, p3, p4, p5, p6,time;
   TTree Result_tree("Result_tree","");
   Result_tree.Branch("om_number", &om_number);
   Result_tree.Branch("p0", &p0);
@@ -555,9 +498,10 @@ void fit_ref(int run_number) {
   Result_tree.Branch("p4", &p4);
   Result_tree.Branch("p5", &p5);
   Result_tree.Branch("p6", &p6);
+  Result_tree.Branch("time", &time2);
+  Result_tree.Branch("run_number", &run_number);
 
   TFile tree_file(Form("histo_brut/histo_Li_system_%d.root", run_number), "READ");
-  double time;
   double charge_tree;
   double amplitude_tree;
   TTree* tree = (TTree*)tree_file.Get("Result_tree");
@@ -570,6 +514,8 @@ void fit_ref(int run_number) {
   tree->SetBranchAddress("charge_tree", &charge_tree);
   tree->SetBranchStatus("amplitude_tree",1);
   tree->SetBranchAddress("amplitude_tree", &amplitude_tree);
+  tree->SetBranchStatus("time",1);
+  tree->SetBranchAddress("time", &time);
   TCanvas* canvas = new TCanvas;
 
   for (int om = 800; om < 805; om++) {
@@ -595,206 +541,189 @@ void fit_ref(int run_number) {
 
     delete spectre;
   }
-newfile.cd();
-Result_tree.Write();
-newfile.Close();
+  newfile.cd();
+  Result_tree.Write();
+  newfile.Close();
 }
 
-void fit_ref_Hea(int run_number) {
-  gStyle->SetOptFit(1);
-  gStyle->SetOptStat(1);
-  TFile newfile("Resultats_root/fit_ref.root","RECREATE");
-  int om_number;
-  double p0, p1, p2;
-  TTree Result_tree("Result_tree","");
-  Result_tree.Branch("om_number", &om_number);
-  Result_tree.Branch("p0", &p0);
-  Result_tree.Branch("p1", &p1);
-  Result_tree.Branch("p2", &p2);
-
-
-  TFile tree_file(Form("histo_brut/histo_Li_system_%d.root", run_number), "READ");
-  double time;
-  double charge_tree;
-  double amplitude_tree;
-  TTree* tree = (TTree*)tree_file.Get("Result_tree");
-  tree->SetBranchStatus("*",0);
-  tree->SetBranchStatus("om_number",1);
-  tree->SetBranchAddress("om_number", &om_number);
-  tree->SetBranchStatus("time",1);
-  tree->SetBranchAddress("time", &time);
-  tree->SetBranchStatus("charge_tree",1);
-  tree->SetBranchAddress("charge_tree", &charge_tree);
-  tree->SetBranchStatus("amplitude_tree",1);
-  tree->SetBranchAddress("amplitude_tree", &amplitude_tree);
-  TCanvas* canvas = new TCanvas;
-
-  for (int om = 800; om < 805; om++) {
-    om_number = om;
-    TH1D *spectre = new TH1D ("spectre_amplitude", "", 600, 0, 600) ;
-    tree->Project("spectre_amplitude", "amplitude_tree", Form("om_number == %d", om));
-    spectre->Draw();
-    TF1* f_Heaviside = new TF1 ("f_Heaviside","(1 + exp(x * [0])) / (1 + exp((x - [1]) / [2]))", 0, 1200);  // Heaviside for gamma
-    f_Heaviside->SetParNames("P0","P1","P2");
-    f_Heaviside->SetRange(60,180);
-    f_Heaviside->SetParameters(312.8, 160.1, 1.675);
-    f_Heaviside->Draw("same");
-    spectre->Fit(f_Heaviside, "RQ0");
-    p0 = f_Heaviside->GetParameter(0);
-    p1 = f_Heaviside->GetParameter(1);
-    p2 = f_Heaviside->GetParameter(2);
-    canvas->SaveAs(Form("fit/fit_ref/ref_fit_om_%d.png", om));
-    Result_tree.Fill();
-    delete spectre;
-  }
-newfile.cd();
-Result_tree.Write();
-newfile.Close();
-}
-
-void fit_ref_tot(int run_number) {
-  gStyle->SetOptFit(1);
-  gStyle->SetOptStat(1);
-  TFile newfile("Resultats_root/fit_ref.root","RECREATE");
-  int om_number;
-  double p0, p1, p2, p3, p4, p5, p6;
-  TTree Result_tree("Result_tree","");
-  Result_tree.Branch("om_number", &om_number);
-  Result_tree.Branch("p0", &p0);
-  Result_tree.Branch("p1", &p1);
-  Result_tree.Branch("p2", &p2);
-
-
-  TFile tree_file(Form("histo_brut/histo_Li_system_%d.root", run_number), "READ");
-  double time;
-  double charge_tree;
-  double amplitude_tree;
-  TTree* tree = (TTree*)tree_file.Get("Result_tree");
-  tree->SetBranchStatus("*",0);
-  tree->SetBranchStatus("om_number",1);
-  tree->SetBranchAddress("om_number", &om_number);
-  tree->SetBranchStatus("time",1);
-  tree->SetBranchAddress("time", &time);
-  tree->SetBranchStatus("charge_tree",1);
-  tree->SetBranchAddress("charge_tree", &charge_tree);
-  tree->SetBranchStatus("amplitude_tree",1);
-  tree->SetBranchAddress("amplitude_tree", &amplitude_tree);
-  TCanvas* canvas = new TCanvas;
-
-  for (int om = 800; om < 801; om++) {
-    om_number = om;
-    TH1D *spectre = new TH1D ("spectre_amplitude", "", 600, 0, 600) ;
-    tree->Project("spectre_amplitude", "amplitude_tree", Form("om_number == %d", om));
-    spectre->Draw();
-
-    TF1* f_fit_tot = new TF1 ("f_fit_tot" , "[0]*(7.11*TMath::Gaus(x[0],[1],[2]*sqrt([1])) + 1.84*TMath::Gaus(x[0],([1]+([1]/976.0)*72),[2]*sqrt([1]))) + 0.54*TMath::Gaus(x[0],([1]+([1]/976.0)*84),[2]*sqrt([1])) + [3]*(1.52*TMath::Gaus(x[0],[4],[2]*sqrt([4])) + 0.44*TMath::Gaus(x[0],([4]+([1]/976.0)*73),[2]*sqrt([4])) + 0.15*TMath::Gaus(x[0],([4]+([1]/976.0)*85),[2]*sqrt([4]))) + exp(-[5]*x[0]+[6]) + ((1 + exp(x*[7]))/(1+exp((x-[8])/[9]))) + ((1+exp(x*[10]))/(1+exp((x-[11])/[12])))", 0, 1200);
-    f_fit_tot->SetRange(60,200);
-    double param[13] = {312.8, 160.1, 1.675, 12798, 66.59, 0.01237, 9.224, -3, -1, -1.8,-2.83, 0.2126, -213};
-    f_fit_tot->SetParameters(param);
-
-    f_fit_tot->Draw("same");
-    // spectre->Fit(f_fit_tot, "RQ0");
-    // spectre->Fit(f_fit_tot, "RQ0");
-    // spectre->Fit(f_fit_tot, "RQ0");
-    // spectre->Fit(f_fit_tot, "RQ0");
-    // spectre->Fit(f_fit_tot, "RQ0");
-    // spectre->Fit(f_fit_tot, "RQ0");
-    // spectre->Fit(f_fit_tot, "RQ0");
-    // canvas->SetLogy();
-    canvas->SaveAs(Form("fit/fit_ref/ref_fit_om_%d.png", om));
-    // Result_tree.Fill();
-    // delete spectre;
-  }
-newfile.cd();
-Result_tree.Write();
-newfile.Close();
-}
+// void fit_ref_Hea(int run_number) {
+//   gStyle->SetOptFit(1);
+//   gStyle->SetOptStat(1);
+//   TFile newfile("Resultats_root/fit_ref.root","RECREATE");
+//   int om_number;
+//   double p0, p1, p2;
+//   TTree Result_tree("Result_tree","");
+//   Result_tree.Branch("om_number", &om_number);
+//   Result_tree.Branch("p0", &p0);
+//   Result_tree.Branch("p1", &p1);
+//   Result_tree.Branch("p2", &p2);
 //
-// void Ref_variation(std::vector<int> run_number) {
+//
+//   TFile tree_file(Form("histo_brut/histo_Li_system_%d.root", run_number), "READ");
+//   double time;
+//   double charge_tree;
+//   double amplitude_tree;
+//   TTree* tree = (TTree*)tree_file.Get("Result_tree");
+//   tree->SetBranchStatus("*",0);
+//   tree->SetBranchStatus("om_number",1);
+//   tree->SetBranchAddress("om_number", &om_number);
+//   tree->SetBranchStatus("time",1);
+//   tree->SetBranchAddress("time", &time);
+//   tree->SetBranchStatus("charge_tree",1);
+//   tree->SetBranchAddress("charge_tree", &charge_tree);
+//   tree->SetBranchStatus("amplitude_tree",1);
+//   tree->SetBranchAddress("amplitude_tree", &amplitude_tree);
+//   TCanvas* canvas = new TCanvas;
+//
+//   for (int om = 800; om < 805; om++) {
+//     om_number = om;
+//     TH1D *spectre = new TH1D ("spectre_amplitude", "", 600, 0, 600) ;
+//     tree->Project("spectre_amplitude", "amplitude_tree", Form("om_number == %d", om));
+//     spectre->Draw();
+//     TF1* f_Heaviside = new TF1 ("f_Heaviside","(1 + exp(x * [0])) / (1 + exp((x - [1]) / [2]))", 0, 1200);  // Heaviside for gamma
+//     f_Heaviside->SetParNames("P0","P1","P2");
+//     f_Heaviside->SetRange(60,180);
+//     f_Heaviside->SetParameters(312.8, 160.1, 1.675);
+//     f_Heaviside->Draw("same");
+//     spectre->Fit(f_Heaviside, "RQ0");
+//     p0 = f_Heaviside->GetParameter(0);
+//     p1 = f_Heaviside->GetParameter(1);
+//     p2 = f_Heaviside->GetParameter(2);
+//     canvas->SaveAs(Form("fit/fit_ref/ref_fit_om_%d.png", om));
+//     Result_tree.Fill();
+//     delete spectre;
+//   }
+//   newfile.cd();
+//   Result_tree.Write();
+//   newfile.Close();
+// }
+//
+// void fit_ref_tot(int run_number) {
+//   gStyle->SetOptFit(1);
+//   gStyle->SetOptStat(1);
+//   TFile newfile("Resultats_root/fit_ref.root","RECREATE");
+//   int om_number;
+//   double p0, p1, p2, p3, p4, p5, p6;
+//   TTree Result_tree("Result_tree","");
+//   Result_tree.Branch("om_number", &om_number);
+//   Result_tree.Branch("p0", &p0);
+//   Result_tree.Branch("p1", &p1);
+//   Result_tree.Branch("p2", &p2);
+//
+//
+//   TFile tree_file(Form("histo_brut/histo_Li_system_%d.root", run_number), "READ");
+//   double time;
+//   double charge_tree;
+//   double amplitude_tree;
+//   TTree* tree = (TTree*)tree_file.Get("Result_tree");
+//   tree->SetBranchStatus("*",0);
+//   tree->SetBranchStatus("om_number",1);
+//   tree->SetBranchAddress("om_number", &om_number);
+//   tree->SetBranchStatus("time",1);
+//   tree->SetBranchAddress("time", &time);
+//   tree->SetBranchStatus("charge_tree",1);
+//   tree->SetBranchAddress("charge_tree", &charge_tree);
+//   tree->SetBranchStatus("amplitude_tree",1);
+//   tree->SetBranchAddress("amplitude_tree", &amplitude_tree);
+//   TCanvas* canvas = new TCanvas;
+//
+//   for (int om = 800; om < 801; om++) {
+//     om_number = om;
+//     TH1D *spectre = new TH1D ("spectre_amplitude", "", 600, 0, 600) ;
+//     tree->Project("spectre_amplitude", "amplitude_tree", Form("om_number == %d", om));
+//     spectre->Draw();
+//
+//     TF1* f_fit_tot = new TF1 ("f_fit_tot" , "[0]*(7.11*TMath::Gaus(x[0],[1],[2]*sqrt([1])) + 1.84*TMath::Gaus(x[0],([1]+([1]/976.0)*72),[2]*sqrt([1]))) + 0.54*TMath::Gaus(x[0],([1]+([1]/976.0)*84),[2]*sqrt([1])) + [3]*(1.52*TMath::Gaus(x[0],[4],[2]*sqrt([4])) + 0.44*TMath::Gaus(x[0],([4]+([1]/976.0)*73),[2]*sqrt([4])) + 0.15*TMath::Gaus(x[0],([4]+([1]/976.0)*85),[2]*sqrt([4]))) + exp(-[5]*x[0]+[6]) + ((1 + exp(x*[7]))/(1+exp((x-[8])/[9]))) + ((1+exp(x*[10]))/(1+exp((x-[11])/[12])))", 0, 1200);
+//     f_fit_tot->SetRange(60,200);
+//     double param[13] = {312.8, 160.1, 1.675, 12798, 66.59, 0.01237, 9.224, -3, -1, -1.8,-2.83, 0.2126, -213};
+//     f_fit_tot->SetParameters(param);
+//
+//     f_fit_tot->Draw("same");
+//     // spectre->Fit(f_fit_tot, "RQ0");
+//     // spectre->Fit(f_fit_tot, "RQ0");
+//     // spectre->Fit(f_fit_tot, "RQ0");
+//     // spectre->Fit(f_fit_tot, "RQ0");
+//     // spectre->Fit(f_fit_tot, "RQ0");
+//     // spectre->Fit(f_fit_tot, "RQ0");
+//     // spectre->Fit(f_fit_tot, "RQ0");
+//     // canvas->SetLogy();
+//     canvas->SaveAs(Form("fit/fit_ref/ref_fit_om_%d.png", om));
+//     // Result_tree.Fill();
+//     // delete spectre;
+//   }
+//   newfile.cd();
+//   Result_tree.Write();
+//   newfile.Close();
+// }
+//
+// void Ref_variation(std::vector<int> run_number, std::vector<int> time) {
 //
 //   int om_number;
-//   double time;
+//   double pic;
 //   double charge;
 //   double amplitude;
+//   int ntime = time.size();
+//   TFile fit_file(Form("Resultats_root/Amplitude_Li_run_%d.root", run_number[1]),"READ");
+//   TTree* Li_tree = (TTree*)fit_file.Get("Result_tree");
+//   Li_tree->SetBranchStatus("*",0);
+//   Li_tree->SetBranchStatus("om_number",1);
+//   Li_tree->SetBranchAddress("om_number", &om_number);
+//   Li_tree->SetBranchStatus("run_number",1);
+//   Li_tree->SetBranchAddress("run_number", &run_number);
+//   Li_tree->SetBranchStatus("pic",1);
+//   Li_tree->SetBranchAddress("pic", &pic);
+//   Li_tree->SetBranchStatus("charge_tree",1);
+//   Li_tree->SetBranchAddress("charge_tree", &charge);
+//   Li_tree->SetBranchStatus("amplitude_tree",1);
+//   Li_tree->SetBranchAddress("amplitude_tree", &amplitude);
 //
-//   for (int i = 0; i < run_number.size(); i++) {
+//   TH3D* MC_Simu = new TH3D("LI_fit"), "LI_fit"),
+//                           805, 0, 805,
+//                           6, 1, 6,
+//                           , charge_bin_min, charge_bin_max);
 //
-//
-//
-//     TFile fit_file(Form("Resultats_root/Amplitude_Li_run_%d.root", run_number[1]),"READ");
-//     TTree* tree = (TTree*)fit_file.Get("Result_tree");
-//     tree->SetBranchStatus("*",0);
-//     tree->SetBranchStatus("om_number",1);
-//     tree->SetBranchAddress("om_number", &om_number);
-//     tree->SetBranchStatus("time",1);
-//     tree->SetBranchAddress("time", &time);
-//     tree->SetBranchStatus("charge_tree",1);
-//     tree->SetBranchAddress("charge_tree", &charge);
-//     tree->SetBranchStatus("amplitude_tree",1);
-//     tree->SetBranchAddress("amplitude_tree", &amplitude);
-//   }
-//
-//
-//     double comp[520];
-//
-//     for (int i = 0; i < 520; i++) {
-//       Result_tree.GetEntry(i);
-//       comp[i] = charge;
-//       // error1[i] = mean_error;
+//   for (int i = 0; i < 805; i++) {
+//     if (i == 712) {
+//       i = 800
 //     }
+//     Result_tree.GetEntry(i);
 //
-//   double yaxis;
-//   double yaxis_error[4];
-//   double xaxis[4] = {0, 19, 38, 57};
-//   double xaxiserror[4] = {0.5, 0.5, 0.5, 0.5};
-//       for (int j = 0; j < 520; j++){
-//         for (int i = 0; i < 4; i++) {
-//           int nombre = 520*i+j;
-//           Result_tree.GetEntry(nombre);
-//           yaxis = mean_charge/comp[j];
-//           // std::cout << "om = " << j << " and var = " << yaxis << '\n';
-//           if ((yaxis < 0.9) || (yaxis > 1.1)) {
+//     double yaxis[ntime];
+//     double yaxis_error[ntime];
+//     for (int j = 0; j < 717; j++){
+//       for (int i = 0; i < 6; i++) {
+//         int nombre = 717*i+j;
+//         Result_tree.GetEntry(nombre);
+//         yaxis = mean_charge/comp[j];
+//         // std::cout << "om = " << j << " and var = " << yaxis << '\n';
+//         if ((yaxis < 0.9) || (yaxis > 1.1)) {
 //
-//             std::cout << " run == " << tab[i] << " om = " << j << " and var = " << yaxis << '\n';
-//           }
+//           std::cout << " run == " << tab[i] << " om = " << j << " and var = " << yaxis << '\n';
+//         }
 //         // yaxis_error[i] = mean_error/comp*1.0 + (mean_charge/(comp*comp))*1.0*error1;
 //       }
 //     }
-//   TGraphErrors comp_map (4, xaxis, yaxis, xaxiserror, yaxis_error);
-//
-//   comp_map.SetNameTitle("fit_Tl", "evolution du gain de l'OM 258");
-//   comp_map.GetXaxis()->SetTitle("Temps (h)");
-//   comp_map.GetYaxis()->SetTitle("Gain(t)/Gain(0)");
-//   comp_map.SetMarkerColor(2);
-//   comp_map.SetMarkerStyle(34);
-//   comp_map.SetMarkerSize(2);
 //
 //
-//
-//
-//
-//
-//
-//
-//
-//
-//
+//   }
 // }
 
-void file_merger(std::vector<int> run) {
-  double mean, mean_error, Khi2;
-  int i_om, run_number, pic;
+void file_merger(std::vector<int> run, std::vector<int> run_ref) {
+  double Amplitude, Amplitude_error, Khi2, p1, p4;
+  int i_om, run_number, pic, time, om_number;
 
   TTree Result_tree("Result_tree","");
   Result_tree.Branch("i_om", &i_om);
   Result_tree.Branch("pic", &pic);
   Result_tree.Branch("Khi2", &Khi2);
-  Result_tree.Branch("mean", &mean);
-  Result_tree.Branch("mean_error", &mean_error);
+  Result_tree.Branch("Amplitude", &Amplitude);
+  Result_tree.Branch("Amplitude_error", &Amplitude_error);
   Result_tree.Branch("run_number", &run_number);
+  Result_tree.Branch("time", &time);
+  Result_tree.Branch("Amplitude_1MeV", &p1);
+  Result_tree.Branch("Amplitude_05MeV", &p4);
 
   for (int j = 0; j < run.size(); j++) {
-
     TFile *file1 = new TFile(Form("Resultats_root/Amplitude_Li_run_%d.root", run[j]), "READ");
     TTree* tree = (TTree*)file1->Get("Result_tree");
     tree->SetBranchStatus("*",0);
@@ -804,20 +733,43 @@ void file_merger(std::vector<int> run) {
     tree->SetBranchAddress("pic", &pic);
     tree->SetBranchStatus("Khi2",1);
     tree->SetBranchAddress("Khi2", &Khi2);
-    tree->SetBranchStatus("mean",1);
-    tree->SetBranchAddress("mean", &mean);
-    tree->SetBranchStatus("mean_error",1);
-    tree->SetBranchAddress("mean_erro", &mean_error);
+    tree->SetBranchStatus("Amplitude",1);
+    tree->SetBranchAddress("Amplitude", &Amplitude);
+    tree->SetBranchStatus("Amplitude_error",1);
+    tree->SetBranchAddress("Amplitude_error", &Amplitude_error);
     tree->SetBranchStatus("run_number",1);
     tree->SetBranchAddress("run_number", &run_number);
-
-    for (size_t i = 0; i < 260; i++) {
+    tree->SetBranchStatus("time",1);
+    tree->SetBranchAddress("time", &time);
+    for (size_t i = 0; i < tree->GetEntries(); i++) {
       tree->GetEntry(i);
       Result_tree.Fill();
     }
+    file1->Close();
   }
 
-  TFile *newfile = new TFile("Resultats_root/fit_total", "RECREATE");
+  for (int j = 0; j < run_ref.size(); j++) {
+    TFile *file1 = new TFile(Form("Resultats_root/fit_ref_run_%d.root", run_ref[j]), "READ");
+    TTree* ref_tree = (TTree*)file1->Get("Result_tree");
+    ref_tree->SetBranchStatus("*",0);
+    ref_tree->SetBranchStatus("om_number",1);
+    ref_tree->SetBranchAddress("om_number", &i_om);
+    ref_tree->SetBranchStatus("p1",1);
+    ref_tree->SetBranchAddress("p1", &p1);
+    ref_tree->SetBranchStatus("p4",1);
+    ref_tree->SetBranchAddress("p4", &p4);
+    ref_tree->SetBranchStatus("run_number",1);
+    ref_tree->SetBranchAddress("run_number", &run_number);
+    ref_tree->SetBranchStatus("time",1);
+    ref_tree->SetBranchAddress("time", &time);
+
+    for (size_t i = 0; i < ref_tree->GetEntries(); i++) {
+      ref_tree->GetEntry(i);
+      Result_tree.Fill();
+    }
+    file1->Close();
+  }
+  TFile *newfile = new TFile("Resultats_root/fit_total.root", "RECREATE");
   newfile->cd();
   Result_tree.Write();
   newfile->Close();
@@ -828,7 +780,7 @@ void file_merger(std::vector<int> run) {
 
 int main(int argc, char const *argv[]){
   int om_number, n_pic, n_run, run, t;
-  std::vector<int> run_number, time;
+  std::vector<int> run_number, time, ref_run_number, ref_time;
   int compteur = 0;
 
   for(int i = 0; i<argc; i++){
@@ -838,12 +790,12 @@ int main(int argc, char const *argv[]){
     }
     if (std::string(argv[i]) == "-PIC" ) {
       n_pic =stoi(argv[i+1]);
-          std::cout << "om n pic = " << n_pic << '\n';
+      std::cout << "om n pic = " << n_pic << '\n';
     }
   }
   std::cout << "How many run do you want ?" << '\n';
   std::cin >> n_run;
-      std::cout << "Write the runs you want" << '\n';
+  std::cout << "Write the runs you want" << '\n';
   while (compteur < n_run && cin >> run) {
     run_number.push_back(run);
     std::cout << "Write the delay between the runs (0 for the first)" << '\n';
@@ -851,17 +803,44 @@ int main(int argc, char const *argv[]){
       time.push_back(t);
       break;
     }
+
     compteur++;
     if (compteur < n_run) {
       std::cout << "Write the runs you want" << '\n';
     }
   }
-
-  for (int i = 0; i < run_number.size(); i++) {
-    fit_LI_amplitude(run_number[i]);
+  compteur = 0;
+  n_run = 0;
+  std::cout << "How many Ref run do you want ?" << '\n';
+  std::cin >> n_run;
+  std::cout << "Write the Ref OM only runs you want" << '\n';
+  while (compteur < n_run && cin >> run) {
+    ref_run_number.push_back(run);
+    std::cout << "Write the delay between the runs (0 for the first)" << '\n';
+    while (compteur < n_run && cin >> t) {
+      ref_time.push_back(t);
+      break;
+    }
+    compteur++;
+    if (compteur < n_run) {
+      std::cout << "Write the Ref runs you want" << '\n';
+    }
   }
 
-  // file_mereger();
+
+
+
+  std::cout << "Code start running" << '\n';
+
+
+
+  for (int i = 0; i < run_number.size(); i++) {
+    fit_LI_amplitude(run_number[i], time[i]);
+  }
+  for (int i = 0; i < ref_run_number.size(); i++) {
+    fit_ref(ref_run_number[i], ref_time[i]);
+  }
+  file_merger(run_number, ref_run_number);
 
 
   // hadd Amplitude_Li_tot Amplitude_Li_run_???.root -f;
@@ -872,3 +851,65 @@ int main(int argc, char const *argv[]){
 
   return 0;
 }
+
+// void Ref_variation_tgraph(std::vector<int> run_number, std::vector<int> time) {
+//
+//   int om_number;
+//   double pic;
+//   double charge;
+//   double amplitude;
+//   int ntime = time.size();
+//   TFile fit_file(Form("Resultats_root/Amplitude_Li_run_%d.root", run_number[1]),"READ");
+//   TTree* Li_tree = (TTree*)fit_file.Get("Result_tree");
+//   Li_tree->SetBranchStatus("*",0);
+//   Li_tree->SetBranchStatus("om_number",1);
+//   Li_tree->SetBranchAddress("om_number", &om_number);
+//   Li_tree->SetBranchStatus("run_number",1);
+//   Li_tree->SetBranchAddress("run_number", &run_number);
+//   Li_tree->SetBranchStatus("pic",1);
+//   Li_tree->SetBranchAddress("pic", &pic);
+//   Li_tree->SetBranchStatus("charge_tree",1);
+//   Li_tree->SetBranchAddress("charge_tree", &charge);
+//   Li_tree->SetBranchStatus("amplitude_tree",1);
+//   Li_tree->SetBranchAddress("amplitude_tree", &amplitude);
+//
+//   double comp[717];
+//
+//   for (int i = 0; i < 805; i++) {
+//     if (i == 712) {
+//       i = 800
+//     }
+//     Result_tree.GetEntry(i);
+//     comp[i] = charge;
+//     // error1[i] = mean_error;
+//
+//     for (int i = 0; i < time.size(); i++) {
+//       double xaxis[i] = temps[i];
+//       double xaxiserror[i] = temps[i]*0.01;
+//     }
+//     double yaxis[ntime];
+//     double yaxis_error[ntime];
+//     for (int j = 0; j < 717; j++){
+//       for (int i = 0; i < 6; i++) {
+//         int nombre = 717*i+j;
+//         Result_tree.GetEntry(nombre);
+//         yaxis = mean_charge/comp[j];
+//         // std::cout << "om = " << j << " and var = " << yaxis << '\n';
+//         if ((yaxis < 0.9) || (yaxis > 1.1)) {
+//
+//           std::cout << " run == " << tab[i] << " om = " << j << " and var = " << yaxis << '\n';
+//         }
+//         // yaxis_error[i] = mean_error/comp*1.0 + (mean_charge/(comp*comp))*1.0*error1;
+//       }
+//     }
+//     TGraphErrors comp_map (4, xaxis, yaxis, xaxiserror, yaxis_error);
+//
+//     comp_map.SetNameTitle("fit_Tl", "Li gain evolution");
+//     comp_map.GetXaxis()->SetTitle("Temps (h)");
+//     comp_map.GetYaxis()->SetTitle("Gain(t)/Gain(0)");
+//     comp_map.SetMarkerColor(2);
+//     comp_map.SetMarkerStyle(34);
+//     comp_map.SetMarkerSize(2);
+//
+//   }
+// }
