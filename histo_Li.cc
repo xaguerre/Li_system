@@ -36,16 +36,18 @@
 #include <boost/filesystem.hpp>
 using namespace std;
 
+TH2F* amplitude_spectre = NULL;
 
-
-
-TH1D* spectre_amplitude(int om_number, int file_number ){
-  TFile *file = new TFile(Form("histo_brut/histo_charge_amplitude_energie_%i.root", file_number), "READ");
+void Load_spectre(int run_number){
+  TFile *file = new TFile(Form("histo_brut/histo_charge_amplitude_energie_%d.root", run_number), "READ");
   gROOT->cd();
-  TH2F* amplitude = (TH2F*)file->Get("histo_pm_amplitude");
+  amplitude_spectre = (TH2F*)file->Get("histo_pm_amplitude");
+  // amplitude_spectre->RebinY(4);
+  return;
+}
 
-  TH1D* spectre_amplitude = amplitude->ProjectionY(Form("amplitude%03d",om_number), om_number+1, om_number+1);
-  file->Close();
+TH1D* spectre_amplitude(int om_number){
+  TH1D* spectre_amplitude = amplitude_spectre->ProjectionY(Form("amplitude%03d",om_number), om_number+1, om_number+1);
   return spectre_amplitude;
 }
 
@@ -280,108 +282,210 @@ void fit_all_om_charge(int run_number){
   return;
 }
 
-void fit_all_om_amplitude(int run_number){
+
+
+double* om_gain_fit(int om, int run_number){
   gStyle->SetOptFit(1);
   gStyle->SetOptStat(0);
-  TH1::SetDefaultSumw2();
-  TH2::SetDefaultSumw2();
 
-  std::ofstream outFile("Resultats_txt/Resultats_amplitude.txt");
-  std::ifstream parametres("/home/aguerre/Bureau/Thèse/Li_system/Resultats_txt/Resultats_amplitude_run_547.txt");
 
-  TFile file(Form("Resultats_root/amplitude_Li_run_%d.root", run_number),"RECREATE");
+  TFile file(Form("Resultats_root/Ampl_Tl_run_%d.root", run_number),"RECREATE");
 
   double chi = 0;
   int i_om;
   double n_evt;
-  double mean_amplitude;
   double mean_error;
   double sigma;
   double  nbg;
   double C = 0;
+  double ndf = 0;
+  double chin = 0;
+  double mean = 0;
 
   TTree Result_tree("Result_tree","");
   Result_tree.Branch("run_number", &run_number);
   Result_tree.Branch("i_om", &i_om);
   Result_tree.Branch("n_evt", &n_evt);
-  Result_tree.Branch("mean_amplitude", &mean_amplitude);
+  Result_tree.Branch("mean", &mean);
   Result_tree.Branch("mean_error", &mean_error);
   Result_tree.Branch("sigma", &sigma);
   Result_tree.Branch("C", &C);
   Result_tree.Branch("nbg", &nbg);
   Result_tree.Branch("chi", chi);
 
-  int om_tab[712];
-  double N_evt_tab[712];
-  double mean_tab[712];
-  double sigma_tab[712];
-  double Nbg_tab[712];
-  double C_tab[712];
-  int compteur = 0;
-
-  while(parametres >> om_tab[compteur])  // tant que l'on peut mettre la ligne dans "contenu"
-  {
-    parametres >> N_evt_tab[compteur] >> mean_tab[compteur] >> sigma_tab[compteur] >> Nbg_tab[compteur] >> C_tab[compteur];
-    compteur++;
-  }
-
+  double* tab = new double[3];
   TCanvas* canvas = new TCanvas;
   canvas->SetLogy();
+  TH1D* spectre_om = NULL;
+  spectre_om = spectre_amplitude(om);
+  spectre_om->Draw();
+  TF1* f_ComptonEdgePoly = new TF1 ("f_ComptonEdgePoly","[0]/2.0*(1+TMath::Erf(([1]-x)/(TMath::Sqrt(2)*[2])))+[3]*x", 400, 900);
+  f_ComptonEdgePoly->SetParNames("N_evt","Mean","Sigma","Nbg" );
 
-  for(int om = 1; om < 2; om+=1)
+  if ((om % 13) == 12 )        //om multiple de (13)-1
   {
-    TH1D* spectre_om = spectre_amplitude(om_tab[om], run_number);
-    spectre_om->Draw();
-    TF1* f_ComptonEdgePoly = new TF1 ("f_ComptonEdgePoly","[0]*(0.5*(1+TMath::Erf(([1]-x)/(TMath::Sqrt(2)*[2]))) + [3]*x + [4])", 400, 900);
-    f_ComptonEdgePoly->SetParNames("N_evt","mean_amplitude","Sigma", "Nbg", "C" );
-
-    std::cout << "om = " << om_tab[om] << " and mean = " << mean_tab[om] << " and C = " << C_tab[om] << '\n';
-
-    f_ComptonEdgePoly->SetParameters(N_evt_tab[om], mean_tab[om], sigma_tab[om], Nbg_tab[om]/N_evt_tab[om], C_tab[om]/N_evt_tab[om]);
-    f_ComptonEdgePoly->SetRange(mean_tab[om]-2.5*sigma_tab[om], mean_tab[om]+2.5*sigma_tab[om]);
-    f_ComptonEdgePoly->SetParLimits(0, 0, 2);
-    f_ComptonEdgePoly->SetParLimits(1, 0, 2000);
-    f_ComptonEdgePoly->SetParLimits(2, 0, 100);
-    f_ComptonEdgePoly->SetParLimits(3, -10, 0);
-    f_ComptonEdgePoly->SetParLimits(4, 0, 20);
+    f_ComptonEdgePoly->SetParameters(120, 723, 68, 3.91e-5);
+    f_ComptonEdgePoly->SetRange(600,1000);
     f_ComptonEdgePoly->Draw("same");
-    spectre_om->Fit(f_ComptonEdgePoly, "RQ");
+    spectre_om->Fit(f_ComptonEdgePoly, "RQ0");
     f_ComptonEdgePoly->SetRange(f_ComptonEdgePoly->GetParameter(1)-2.5*f_ComptonEdgePoly->GetParameter(2),f_ComptonEdgePoly->GetParameter(1)+5*f_ComptonEdgePoly->GetParameter(2));
-    spectre_om->Fit(f_ComptonEdgePoly, "RQ");
+    spectre_om->Fit(f_ComptonEdgePoly, "RQ0");
     f_ComptonEdgePoly->SetRange(f_ComptonEdgePoly->GetParameter(1)-2.5*f_ComptonEdgePoly->GetParameter(2),f_ComptonEdgePoly->GetParameter(1)+5*f_ComptonEdgePoly->GetParameter(2));
-    spectre_om->Fit(f_ComptonEdgePoly, "RQ");
-
-    i_om = om_tab[om];
-    n_evt = (f_ComptonEdgePoly->GetParameter(0));
-    mean_amplitude = (f_ComptonEdgePoly->GetParameter(1));
-    sigma = (f_ComptonEdgePoly->GetParameter(2));
-    nbg = (f_ComptonEdgePoly->GetParameter(3));
-    C = (f_ComptonEdgePoly->GetParameter(4));
-    mean_error = f_ComptonEdgePoly->GetParError(1);
-    chi = (f_ComptonEdgePoly->GetChisquare()/f_ComptonEdgePoly->GetNDF());
-    std::cout << "chi = " << chi << '\n';
-    Result_tree.Fill();
-    //mapping
-    int om_col = (om % 13 );
-    int om_row = (om / 13);
-
-    canvas->SaveAs(Form("fit/fit_Tl/amplitude/amplitude_fit_om_%03d_run_%d.png", om_tab[om], run_number));
-
-    outFile << i_om << "\t" << n_evt << "\t" << mean_amplitude << "\t" << sigma << "\t"<< nbg << "\t" << C << endl;
-
-    delete spectre_om;
-    delete f_ComptonEdgePoly;
+    spectre_om->Fit(f_ComptonEdgePoly, "RQ0");
   }
+  else if ((om % 13) == 0)       //om multiple de 13
+  {
+    f_ComptonEdgePoly->SetParameters(112, 681, 56, 1.2e-05);
+    f_ComptonEdgePoly->SetRange(500,1000);
+    f_ComptonEdgePoly->Draw("same");
+    spectre_om->Fit(f_ComptonEdgePoly, "RQ0");
+    f_ComptonEdgePoly->SetRange(f_ComptonEdgePoly->GetParameter(1)-2.5*f_ComptonEdgePoly->GetParameter(2),f_ComptonEdgePoly->GetParameter(1)+5*f_ComptonEdgePoly->GetParameter(2));
+    spectre_om->Fit(f_ComptonEdgePoly, "RQ0");
+    f_ComptonEdgePoly->SetRange(f_ComptonEdgePoly->GetParameter(1)-1.5*f_ComptonEdgePoly->GetParameter(2),f_ComptonEdgePoly->GetParameter(1)+5*f_ComptonEdgePoly->GetParameter(2));
+    spectre_om->Fit(f_ComptonEdgePoly, "RQ0");
+  }
+  else         //om normaux (8pouces)
+  {
+    f_ComptonEdgePoly->SetParameters(111, 609, 37, 4.19e-05);
+    f_ComptonEdgePoly->SetRange(450,1000);
+    f_ComptonEdgePoly->Draw("same");
+    spectre_om->Fit(f_ComptonEdgePoly, "RQ0");
+    f_ComptonEdgePoly->SetRange(f_ComptonEdgePoly->GetParameter(1)-2.5*f_ComptonEdgePoly->GetParameter(2),f_ComptonEdgePoly->GetParameter(1)+7.5*f_ComptonEdgePoly->GetParameter(2));
+    spectre_om->Fit(f_ComptonEdgePoly, "RQ0");
+    f_ComptonEdgePoly->SetRange(f_ComptonEdgePoly->GetParameter(1)-3.5*f_ComptonEdgePoly->GetParameter(2),f_ComptonEdgePoly->GetParameter(1)+7.5*f_ComptonEdgePoly->GetParameter(2));
+    spectre_om->Fit(f_ComptonEdgePoly, "RQ0");
 
-  file.cd();
-  Result_tree.Write();
+  }
+canvas->SaveAs(Form("fit/fit_Tl/amplitude/amplitude_fit_om_%d_run_.png", om));
 
-  file.Close();
-  outFile.close();
+  chi = (f_ComptonEdgePoly->GetChisquare());
+  std::cout << chi << '\n';
+  ndf = (f_ComptonEdgePoly->GetNDF());
+  chin = (f_ComptonEdgePoly->GetChisquare()/f_ComptonEdgePoly->GetNDF());
 
-  return;
+  if (chin < 1.5 && mean > 70) {
+    n_evt = f_ComptonEdgePoly->GetParameter(0);
+    mean = (f_ComptonEdgePoly->GetParameter(1))/2.6;
+    sigma = (f_ComptonEdgePoly->GetParameter(2))/2.6;
+    nbg = f_ComptonEdgePoly->GetParameter(3);
+  }
+  else{
+    n_evt = 0;
+    mean = 0;
+    sigma = 0;
+    nbg = 0;
+  }
+  delete f_ComptonEdgePoly;
+  delete canvas;
+  tab[0] = mean;
+  tab[1] = mean_error;
+  tab[2] = chin;
+  return tab;
 }
 
+// void fit_all_om_amplitude(int run_number){
+//   Load_spectre(run_number);
+//   gStyle->SetOptFit(1);
+//   gStyle->SetOptStat(0);
+//   TH1::SetDefaultSumw2();
+//   TH2::SetDefaultSumw2();
+//
+//   std::ofstream outFile("Resultats_txt/Resultats_amplitude.txt");
+//   std::ifstream parametres("/home/aguerre/Bureau/Thèse/Li_system/Resultats_txt/Resultats_ampl_tot.txt");
+//
+//   TFile file(Form("Resultats_root/amplitude_Li_run_%d.root", run_number),"RECREATE");
+//
+//   double chi = 0;
+//   int i_om;
+//   double n_evt;
+//   double mean_amplitude;
+//   double mean_error;
+//   double sigma;
+//   double  nbg;
+//   double C = 0;
+//
+//   TTree Result_tree("Result_tree","");
+//   Result_tree.Branch("run_number", &run_number);
+//   Result_tree.Branch("i_om", &i_om);
+//   Result_tree.Branch("n_evt", &n_evt);
+//   Result_tree.Branch("mean_amplitude", &mean_amplitude);
+//   Result_tree.Branch("mean_error", &mean_error);
+//   Result_tree.Branch("sigma", &sigma);
+//   Result_tree.Branch("C", &C);
+//   Result_tree.Branch("nbg", &nbg);
+//   Result_tree.Branch("chi", chi);
+//
+//   int om_tab[712];
+//   double N_evt_tab[712];
+//   double mean_tab[712];
+//   double sigma_tab[712];
+//   double Nbg_tab[712];
+//   double C_tab[712];
+//   int compteur = 0;
+//
+//   while(parametres >> om_tab[compteur])  // tant que l'on peut mettre la ligne dans "contenu"
+//   {
+//     parametres >> N_evt_tab[compteur] >> mean_tab[compteur] >> sigma_tab[compteur] >> Nbg_tab[compteur] >> C_tab[compteur];
+//     compteur++;
+//   }
+//
+//   TCanvas* canvas = new TCanvas;
+//   canvas->SetLogy();
+//
+//   for(int om = 12; om < 13; om+=1)
+//   {
+//     TH1D* spectre_om = spectre_amplitude(om_tab[om]);
+//     spectre_om->Draw();
+//     TF1* f_ComptonEdgePoly = new TF1 ("f_ComptonEdgePoly","[0]*(0.5*(1+TMath::Erf(([1]-x)/(TMath::Sqrt(2)*[2]))) + [3]*x + [4])", 400, 900);
+//     f_ComptonEdgePoly->SetParNames("N_evt","mean_amplitude","Sigma", "Nbg", "C" );
+//
+//     std::cout << "om = " << om_tab[om] << " and mean = " << mean_tab[om] << " and C = " << C_tab[om] << '\n';
+//
+//     f_ComptonEdgePoly->SetParameters(N_evt_tab[om], mean_tab[om], sigma_tab[om], Nbg_tab[om]/N_evt_tab[om], C_tab[om]/N_evt_tab[om]);
+//     // f_ComptonEdgePoly->SetRange(mean_tab[om]-2.5*sigma_tab[om], mean_tab[om]+2.5*sigma_tab[om]);
+//     f_ComptonEdgePoly->SetParLimits(0, 0, 2);
+//     f_ComptonEdgePoly->SetParLimits(1, 0, 2000);
+//     f_ComptonEdgePoly->SetParLimits(2, 0, 100);
+//     f_ComptonEdgePoly->SetParLimits(3, -10, 0);
+//     f_ComptonEdgePoly->SetParLimits(4, 0, 20);
+//     f_ComptonEdgePoly->Draw("same");
+//     spectre_om->Fit(f_ComptonEdgePoly, "RQ");
+//     f_ComptonEdgePoly->SetRange(f_ComptonEdgePoly->GetParameter(1)-2.5*f_ComptonEdgePoly->GetParameter(2),f_ComptonEdgePoly->GetParameter(1)+5*f_ComptonEdgePoly->GetParameter(2));
+//     spectre_om->Fit(f_ComptonEdgePoly, "RQ");
+//     f_ComptonEdgePoly->SetRange(f_ComptonEdgePoly->GetParameter(1)-2.5*f_ComptonEdgePoly->GetParameter(2),f_ComptonEdgePoly->GetParameter(1)+5*f_ComptonEdgePoly->GetParameter(2));
+//     spectre_om->Fit(f_ComptonEdgePoly, "RQ");
+//
+//     i_om = om_tab[om];
+//     n_evt = (f_ComptonEdgePoly->GetParameter(0));
+//     mean_amplitude = (f_ComptonEdgePoly->GetParameter(1));
+//     sigma = (f_ComptonEdgePoly->GetParameter(2));
+//     nbg = (f_ComptonEdgePoly->GetParameter(3));
+//     C = (f_ComptonEdgePoly->GetParameter(4));
+//     mean_error = f_ComptonEdgePoly->GetParError(1);
+//     chi = (f_ComptonEdgePoly->GetChisquare()/f_ComptonEdgePoly->GetNDF());
+//     std::cout << "chi = " << chi << '\n';
+//     Result_tree.Fill();
+//     //mapping
+//     int om_col = (om % 13 );
+//     int om_row = (om / 13);
+//
+//     canvas->SaveAs(Form("fit/fit_Tl/amplitude/amplitude_fit_om_%d_run_%d.png", om, run_number));
+//
+//     outFile << i_om << "\t" << n_evt << "\t" << mean_amplitude << "\t" << sigma << "\t"<< nbg << "\t" << C << endl;
+//
+//     delete spectre_om;
+//     delete f_ComptonEdgePoly;
+//   }
+//
+//   file.cd();
+//   Result_tree.Write();
+//
+//   file.Close();
+//   outFile.close();
+//
+//   return;
+// }
+//
 
 int pic_number(double temps){
   int pic_number = 0;
@@ -606,7 +710,7 @@ void fit_ref(int run_number, int time2 = 0) {
   gStyle->SetOptStat(1);
   TFile newfile(Form("Resultats_root/fit_ref_run_%d.root", run_number),"RECREATE");
   int om_number;
-  double p0, p1, p2, p3, p4, p5, p6,time;
+  double p0, p1, p2, p3, p4, p5, p6,time, p1_er, p4_er;
   TTree Result_tree("Result_tree","");
   Result_tree.Branch("om_number", &om_number);
   Result_tree.Branch("p0", &p0);
@@ -616,6 +720,8 @@ void fit_ref(int run_number, int time2 = 0) {
   Result_tree.Branch("p4", &p4);
   Result_tree.Branch("p5", &p5);
   Result_tree.Branch("p6", &p6);
+  Result_tree.Branch("p4_er", &p4_er);
+  Result_tree.Branch("p1_er", &p1_er);
   Result_tree.Branch("time", &time2);
   Result_tree.Branch("run_number", &run_number);
 
@@ -649,9 +755,14 @@ void fit_ref(int run_number, int time2 = 0) {
     spectre->Fit(f_MultipleGaus, "RQ0");
     p0 = f_MultipleGaus->GetParameter(0);
     p1 = f_MultipleGaus->GetParameter(1);
+    p1_er = f_MultipleGaus->GetParError(1);
+
+    std::cout << "par 1 = " << p1 << " +- " << p1_er << '\n';
+
     p2 = f_MultipleGaus->GetParameter(2);
     p3 = f_MultipleGaus->GetParameter(3);
     p4 = f_MultipleGaus->GetParameter(4);
+    p4_er = f_MultipleGaus->GetParError(4);
     p5 = f_MultipleGaus->GetParameter(5);
     p6 = f_MultipleGaus->GetParameter(6);
     canvas->SaveAs(Form("fit/fit_ref/ref_fit_om_%d_run_%d.png", om, run_number));
@@ -828,11 +939,13 @@ void fit_ref(int run_number, int time2 = 0) {
 // }
 
 void file_merger(std::vector<int> run, std::vector<int> run_ref, string addfile = "") {
-  double Amplitude, Amplitude_error, Khi2, p1, p4, Amplitude_1MeV, Amplitude_05MeV, Ampl_norm, Ampl1_norm, Ampl05_norm;
+  double Amplitude, Amplitude_error, Khi2, p1, p4, Amplitude_1MeV, Amplitude_05MeV, Ampl_norm, Ampl1_norm, Ampl05_norm, Ampl05_norm_error, Ampl1_norm_error, p1_er, p4_er;
   int i_om, run_number, pic, time, om_number;
   double norm[717][6];
   double norm1[717];
   double norm05[717];
+  double norm1_er[717];
+  double norm05_er[717];
   for (size_t i = 0; i < 717; i++) {
     for (size_t j = 0; j < run.size(); j++) {
       for (size_t k = 0; k < 6; k++) {
@@ -840,6 +953,8 @@ void file_merger(std::vector<int> run, std::vector<int> run_ref, string addfile 
       }
       norm1[i] = 0;
       norm05[i] = 0;
+      norm1_er[i] = 0;
+      norm05_er[i] = 0;
     }
   }
 
@@ -855,7 +970,9 @@ void file_merger(std::vector<int> run, std::vector<int> run_ref, string addfile 
   Result_tree.Branch("Amplitude_05MeV", &p4);
   Result_tree.Branch("Ampl_norm", &Ampl_norm);
   Result_tree.Branch("Ampl05_norm", &Ampl05_norm);
+  Result_tree.Branch("Ampl05_norm_error", &Ampl05_norm_error);
   Result_tree.Branch("Ampl1_norm", &Ampl1_norm);
+  Result_tree.Branch("Ampl1_norm_error", &Ampl1_norm_error);
 
   Ampl05_norm = 0;
   Ampl1_norm = 0;
@@ -908,8 +1025,12 @@ void file_merger(std::vector<int> run, std::vector<int> run_ref, string addfile 
     ref_tree->SetBranchAddress("om_number", &i_om);
     ref_tree->SetBranchStatus("p1",1);
     ref_tree->SetBranchAddress("p1", &p1);
+    ref_tree->SetBranchStatus("p1_er",1);
+    ref_tree->SetBranchAddress("p1_er", &p1_er);
     ref_tree->SetBranchStatus("p4",1);
     ref_tree->SetBranchAddress("p4", &p4);
+    ref_tree->SetBranchStatus("p4_er",1);
+    ref_tree->SetBranchAddress("p4_er", &p4_er);
     ref_tree->SetBranchStatus("run_number",1);
     ref_tree->SetBranchAddress("run_number", &run_number);
     ref_tree->SetBranchStatus("time",1);
@@ -918,13 +1039,17 @@ void file_merger(std::vector<int> run, std::vector<int> run_ref, string addfile 
       ref_tree->GetEntry(i);
       if (j == 0) {
         norm1[i_om] = p1;
+        norm1_er[i_om] = p1;
         norm05[i_om] = p4;
+        norm05_er[i_om] = p1;
       }
       if (norm05[i_om] != 0) {
         Ampl05_norm = p4/norm05[i_om]*1.;
+        Ampl05_norm_error = abs(p4_er/norm05[i_om]*1.) + abs(norm05_er[i_om]*p4/(norm05[i_om]*norm1[i_om]));
       }
       if (norm1[i_om] != 0) {
         Ampl1_norm = p1/norm1[i_om]*1.;
+        Ampl1_norm_error = abs(p1_er/norm1[i_om]*1.) + abs(norm1_er[i_om]*p1/(norm1[i_om]*norm1[i_om])*1.);
       }
       Result_tree.Fill();
     }
@@ -951,8 +1076,16 @@ void file_merger(std::vector<int> run, std::vector<int> run_ref, string addfile 
     tree->SetBranchAddress("time", &time);
     tree->SetBranchStatus("Amplitude_1MeV",1);
     tree->SetBranchAddress("Amplitude_1MeV", &Amplitude_1MeV);
+    tree->SetBranchStatus("Ampl1_norm",1);
+    tree->SetBranchAddress("Ampl1_norm", &Ampl1_norm);
+    tree->SetBranchStatus("Ampl1_norm_error",1);
+    tree->SetBranchAddress("Ampl1_norm_error", &Ampl1_norm_error);
     tree->SetBranchStatus("Amplitude_05MeV",1);
     tree->SetBranchAddress("Amplitude_05MeV", &Amplitude_05MeV);
+    tree->SetBranchStatus("Ampl05_norm",1);
+    tree->SetBranchAddress("Ampl05_norm", &Ampl05_norm);
+    tree->SetBranchStatus("Ampl05_norm_error",1);
+    tree->SetBranchAddress("Ampl05_norm_error", &Ampl05_norm_error);
 
     for (size_t i = 0; i < tree->GetEntries(); i++) {
       tree->GetEntry(i);
@@ -1043,19 +1176,31 @@ int main(int argc, char const *argv[]){
 //   double charge;
 //   double amplitude;
 //   int ntime = time.size();
-//   TFile fit_file(Form("Resultats_root/Amplitude_Li_run_%d.root", run_number[1]),"READ");
+//   TFile fit_file(Form("Resultats_root/fit_total.root", run_number[1]),"READ");
 //   TTree* Li_tree = (TTree*)fit_file.Get("Result_tree");
 //   Li_tree->SetBranchStatus("*",0);
-//   Li_tree->SetBranchStatus("om_number",1);
-//   Li_tree->SetBranchAddress("om_number", &om_number);
+//   Li_tree->SetBranchStatus("i_om",1);
+//   Li_tree->SetBranchAddress("i_om", &i_om);
 //   Li_tree->SetBranchStatus("run_number",1);
 //   Li_tree->SetBranchAddress("run_number", &run_number);
 //   Li_tree->SetBranchStatus("pic",1);
 //   Li_tree->SetBranchAddress("pic", &pic);
+//   Li_tree->SetBranchStatus("Khi2",1);
+//   Li_tree->SetBranchAddress("Khi2", &Khi2);
 //   Li_tree->SetBranchStatus("charge_tree",1);
 //   Li_tree->SetBranchAddress("charge_tree", &charge);
-//   Li_tree->SetBranchStatus("amplitude_tree",1);
-//   Li_tree->SetBranchAddress("amplitude_tree", &amplitude);
+//   Li_tree->SetBranchStatus("Amplitude",1);
+//   Li_tree->SetBranchAddress("Amplitude", &Amplitude);
+//   Li_tree->SetBranchStatus("Amplitude_error",1);
+//   Li_tree->SetBranchAddress("Amplitude_error", &Amplitude_error);
+//   Li_tree->SetBranchStatus("Amplitude_1MeV",1);
+//   Li_tree->SetBranchAddress("Amplitude_1MeV", &Amplitude_1MeV);
+//   Li_tree->SetBranchStatus("Amplitude_05MeV",1);
+//   Li_tree->SetBranchAddress("Amplitude_05MeV", &Amplitude_05MeV);
+//   Li_tree->SetBranchStatus("Amplitude_1MeV_error",1);
+//   Li_tree->SetBranchAddress("Amplitude_1MeV_error", &Amplitude_1MeV_error);
+//   Li_tree->SetBranchStatus("Amplitude_05MeV_error",1);
+//   Li_tree->SetBranchAddress("Amplitude_05MeV_error", &Amplitude_05MeV_error);
 //
 //   double comp[717];
 //
