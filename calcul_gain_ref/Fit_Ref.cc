@@ -88,14 +88,15 @@ void roofitter(TH1D* modele, TH1D* spectre_om, int om_number)
   Int_t nbins(1024);
 	TArrayD limits(nbins+1);
 
-	RooRealVar *gain=new RooRealVar("gain","gain",1,0,3);
+	RooRealVar *gain=new RooRealVar("gain","gain",1,0.5,1.5);
+  gain->setBins(1000);
 	RooRealVar *binValue[nbins];
 	RooRealVar *binLimValue[nbins+1];
 	RooFormulaVar* binLim[nbins+1];//0 = new RooRealVar("binHeight0","bin 0 Value",0.1,0.0,1.0);
 
 	RooArgList* list = new RooArgList("list");
 	RooArgList* listBin = new RooArgList("listBin");
-  gain->setVal(0.5);
+  gain->setVal(0.1);
 	for(int i=0 ;i<nbins+1;i++)
 	{
 		// limits[i] = 0.0+i*0.5; //etc...
@@ -117,12 +118,48 @@ void roofitter(TH1D* modele, TH1D* spectre_om, int om_number)
   aPdf->plotOn(xFrame,LineColor(kGreen+2));
 
   RooChi2Var RooChi2("Chi2", "Chi2", *aPdf, spectre_data);
-  RooMinimizer *miniChi = new RooMinimizer(RooChi2);
-  double ConvChi = miniChi->minimize("Minuit", "Migrad");  //   Create the Chi2/LogL
+  RooMinuit miniChi(RooChi2);
+  // RooMinimizer *miniChi = new RooMinimizer(RooChi2);
+  miniChi.migrad();
+  miniChi.hesse();
+  RooFitResult* R;
+  RooFitResult* R2;
+  R = miniChi.save();
+  R2 = miniChi.save();
+  for (int i = 0; i < 10; i++) {
+    gain->randomize();
+    // miniChi->minimize("Minuit", "Migrad");  //   Create the Chi2/LogL
+    miniChi.migrad();
+    miniChi.hesse();
+    R2 = miniChi.save();
+    std::cout << "R2 minNLL = " << R2->minNll() << '\n';
+    if (R2->minNll() < R->minNll() ) {
+      R = R2;
+    }
+  }
 
-  double Chi2 = RooChi2.getVal()/(1024 - 2);
-  std::cout << "Chi2 = " << Chi2 << '\n';
-  std::cout << "gain = " << gain->getVal() << " +- " << gain->getError() << '\n';
+  miniChi.hesse();
+  auto* a1= new TCanvas();
+  TH1D* Chisto = (TH1D*)RooChi2.createHistogram("Chisto", *gain);
+
+
+
+  Chisto->Draw();
+  // Chisto->GetXaxis()->SetRangeUser(0.9,1.1);
+  // Chisto->GetYaxis()->SetRangeUser(0,3);
+  // a1->SetLogy();
+  a1->SaveAs("test.root");
+  auto* b = new TCanvas();
+  RooPlot* gainFrame= gain->frame();
+  RooChi2.plotOn(gainFrame);
+  gainFrame->Draw();
+  b->SaveAs("Chi2.root");
+
+
+  double Chi2 = RooChi2.getVal()/(1024 - 1);
+  std::cout << "Chi2 = " << Chi2 << " or Chi2 = " << Chisto->GetMinimum() << '\n';
+  // std::cout << "gain = " << gain->getVal() << " +- " << gain->getError() << '\n';
+  std::cout << "gain = " << ((RooRealVar*)R->floatParsFinal().find(*gain))->getVal() << " +- " <<  ((RooRealVar*)R->floatParsFinal().find(*gain))->getPropagatedError(*R) << '\n';
   // auto* c1=new TCanvas();
 	// RooPlot* xFrame= x->frame();
   // spectre_data.plotOn(xFrame);
@@ -136,7 +173,7 @@ void roofitter(TH1D* modele, TH1D* spectre_om, int om_number)
   // xFrame2->Draw();
 
   // c2->SaveAs("test2.png");
-
+  gain->setVal(((RooRealVar*)R->floatParsFinal().find(*gain))->getVal());
 	aPdf->plotOn(xFrame,LineColor(kRed+2));
 	auto* c1= new TCanvas();
 	xFrame->Draw();
@@ -144,8 +181,7 @@ void roofitter(TH1D* modele, TH1D* spectre_om, int om_number)
   c1->SetLogy();
   c1->SaveAs(Form("fit/fit_ref_%d.png",om_number));
 
-
-  delete miniChi;
+  // delete miniChi;
   delete xFrame;
   delete c1;
   return;
@@ -173,25 +209,27 @@ void Fit_Ref() {
   tree->SetBranchStatus("amplitude_tree",1);
   tree->SetBranchAddress("amplitude_tree", &amplitude_tree);
   int n_evt = 0;
+  TH1D* modele = NULL;
 
   // auto* can = new TCanvas();
   // can->SetLogy();
-  for (int om = 712; om < 717; om++) {
+  for (int om = 712; om < 713; om++) {
 
-    // TH1D* modele = NULL;
-    TH1D *modele = new TH1D ("modele", "", 1024, 0, 200000);
+    // TH1D *modele = new TH1D ("modele", "", 1024, 0, 200000);
     modele = spectre_charge_full(om);
 
 
     TH1D *spectre_om = new TH1D ("spectre_om", "", 1024, 0, 200000);
         // spectre_om = spectre_charge_full(om);
     // spectre_om->Draw();
-    tree->Project("spectre_om", "charge_tree", Form("om_number == %d && time < 300 && Entry$ < 150000", om+88));
+    tree->Project("spectre_om", "charge_tree", Form("om_number == %d && time < 300 && Entry$ > 120e6 ", om+88));
     //
-    // for (int i = 0; i < 50; i++) {
-    //   modele->SetBinContent(i,0);
-    //   spectre_om->SetBinContent(i,0);
-    // }
+    for (int i = 0; i < 50; i++) {
+      modele->SetBinContent(i,0);
+      modele->SetBinError(i, 0);
+      spectre_om->SetBinContent(i,0);
+      spectre_om->SetBinError(i, 0);
+    }
     // for (int i = 0; i > 50; i++) {
     //   modele->SetBinContent(i,0);
     //   spectre_om->SetBinContent(i,0);
@@ -199,14 +237,15 @@ void Fit_Ref() {
     //   modele->SetBinError(i, 0);
     // }
 
-    std::cout << "ok" << '\n';
     roofitter(modele, spectre_om, om);
+
+    modele->Reset();
     delete spectre_om;
-    delete modele;
+
   }
 
 
-
+  delete modele;
 
 
 }
