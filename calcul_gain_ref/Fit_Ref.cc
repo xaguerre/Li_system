@@ -60,9 +60,10 @@ using namespace RooFit;
 #include <RooParametricBinningStepFunction.h>
 
 TH2F* charge_spectre = NULL;
+TH2F* charge_spectre_template = NULL;
 
 void Load_spectre(){
-  TFile *file = new TFile("../histo_brut/histo_ref_714.root", "READ");
+  TFile *file = new TFile("histo_brut/histo_ref_714.root", "READ");
   gROOT->cd();
   charge_spectre = (TH2F*)file->Get("histo_pm_charge");
   return;
@@ -75,13 +76,25 @@ TH1D* spectre_charge_full(int om_number){
 
 }
 
+void Load_spectre_template()){
+  TFile *file = new TFile("histo_brut/histo_ref_716.root", "READ");
+  gROOT->cd();
+  charge_spectre_template = (TH2F*)file->Get("histo_pm_charge");
+  return;
+}
 
-void roofitter(TH1D* modele, TH1D* spectre_om, int om_number)
+TH1D* spectre_charge_full_template(int om_number){
+  TH1D* spectre_charge = charge_spectre_template->ProjectionY(Form("charge%03d",om_number), om_number+1, om_number+1);
+  // spectre_charge->Rebin(4);
+  return spectre_charge;
+
+}
+
+
+double roofitter(TH1D* modele, TH1D* spectre_om, int om_number, double *rootab)
 {
 	using namespace RooFit;
   RooRealVar* x = new RooRealVar("x","x",0,2e5);
-  // modele->Scale(1./modele->Integral());
-  // spectre_om->Scale(1./spectre_om->Integral());
   RooDataHist spectre_data("spectre_data", "spectre_data", *x, Import(*spectre_om));
   x->setBins(1024);
 
@@ -99,7 +112,6 @@ void roofitter(TH1D* modele, TH1D* spectre_om, int om_number)
   gain->setVal(0.1);
 	for(int i=0 ;i<nbins+1;i++)
 	{
-		// limits[i] = 0.0+i*0.5; //etc...
 		binLimValue[i]= new RooRealVar(TString("binLimValue")+=i,TString("binLimValue")+=i, modele->GetBinLowEdge(i));
 
 		binLim[i]= new RooFormulaVar(TString("binLim")+=i,TString("binLim")+=i,"x[0]*x[1]",RooArgList(*binLimValue[i],*gain));
@@ -112,14 +124,13 @@ void roofitter(TH1D* modele, TH1D* spectre_om, int om_number)
 	RooParametricBinningStepFunction  *aPdf = new RooParametricBinningStepFunction("aPdf", "PSF", *x, *list, *listBin, nbins);
   RooPlot* xFrame= x->frame();
 
-	cout<<"val="<<aPdf->getVal()<<endl;
+	// cout<<"val="<<aPdf->getVal()<<endl;
   spectre_data.plotOn(xFrame, MarkerSize(0.1), DataError(RooAbsData::SumW2), DrawOption("P"));
 
   aPdf->plotOn(xFrame,LineColor(kGreen+2));
 
   RooChi2Var RooChi2("Chi2", "Chi2", *aPdf, spectre_data);
   RooMinuit miniChi(RooChi2);
-  // RooMinimizer *miniChi = new RooMinimizer(RooChi2);
   miniChi.migrad();
   miniChi.hesse();
   RooFitResult* R;
@@ -128,7 +139,6 @@ void roofitter(TH1D* modele, TH1D* spectre_om, int om_number)
   R2 = miniChi.save();
   for (int i = 0; i < 10; i++) {
     gain->randomize();
-    // miniChi->minimize("Minuit", "Migrad");  //   Create the Chi2/LogL
     miniChi.migrad();
     miniChi.hesse();
     R2 = miniChi.save();
@@ -141,19 +151,51 @@ void roofitter(TH1D* modele, TH1D* spectre_om, int om_number)
   miniChi.hesse();
   auto* a1= new TCanvas();
   TH1D* Chisto = (TH1D*)RooChi2.createHistogram("Chisto", *gain);
-
+  Chisto->Sumw2(kFALSE);
 
 
   Chisto->Draw();
-  // Chisto->GetXaxis()->SetRangeUser(0.9,1.1);
-  // Chisto->GetYaxis()->SetRangeUser(0,3);
-  // a1->SetLogy();
-  a1->SaveAs("test.root");
-  auto* b = new TCanvas();
-  RooPlot* gainFrame= gain->frame();
-  RooChi2.plotOn(gainFrame);
-  gainFrame->Draw();
-  b->SaveAs("Chi2.root");
+
+  double lim_sup = 0;
+  int test = 0;
+  double compteur = 0;
+  while (test != 1) {
+
+    if (Chisto->GetBinContent(Chisto->GetMinimumBin()+compteur+1)/Chisto->GetBinContent(Chisto->GetMinimumBin()+compteur) > 2){
+      lim_sup = Chisto->GetMinimumBin()+compteur;
+      test = 1;
+    }
+    compteur++;
+  }
+  // TF1 *poly = new TF1("fit", "[0]*x*x + [1]*x + [2]", Chisto->GetBinContent(Chisto->GetMinimumBin()-Chisto->GetMinimumBin()*0.05), lim_sup);
+  std::cout << "lim_sup = " << lim_sup <<'\n';
+    // std::cout << "NbinX = " << Chisto->GetBinContent(1000) <<'\n';
+
+  TF1 *poly = new TF1("fit", "[0]*x*x + [1]*x + [2]", 0.5 + (lim_sup-50)/1000., 0.5 + lim_sup/1000.);
+  std::cout << "lim = " << 0.5 + (lim_sup-100)/1000. << " and " << 0.5 + (lim_sup)/1000. << '\n';
+
+  poly->SetParameter(0 , 150);
+  poly->SetParameter(1 , -300);
+
+  poly->Draw("same");
+  Chisto->Fit(poly, "RQ0");
+
+  double ap, bp, cp;
+
+  ap = poly->GetParameter(0);
+  bp = poly->GetParameter(1);
+  cp = poly->GetParameter(2);
+
+  std::cout << "minX = " << poly->GetMinimumX() << "and min = " << poly->GetMinimum() << '\n';
+
+
+  // a1->SaveAs("test.root");
+  // auto* b = new TCanvas();
+  // RooPlot* gainFrame= gain->frame();
+  // RooChi2.plotOn(gainFrame);
+  // gainFrame->Draw();
+  //
+  // b->SaveAs("Chi2.root");
 
 
   double Chi2 = RooChi2.getVal()/(1024 - 1);
@@ -182,6 +224,12 @@ void roofitter(TH1D* modele, TH1D* spectre_om, int om_number)
   c1->SaveAs(Form("fit/fit_ref_%d.png",om_number));
 
   // delete miniChi;
+  rootab[0] = poly->GetMinimum();
+  rootab[1] = poly->GetMinimumX();
+  // rootab[2] =
+
+
+
   delete xFrame;
   delete c1;
   return;
@@ -190,14 +238,18 @@ void roofitter(TH1D* modele, TH1D* spectre_om, int om_number)
 
 
 
-void Fit_Ref() {
+void Fit_Ref(int run_number) {
   Load_spectre();
   TH1::SetDefaultSumw2();
 
-  double time, charge_tree, amplitude_tree;
+  double time, charge_tree, amplitude_tree, Chi2, gain, gain_error;
   int om_number;
+  double* rootab = new double[3];
 
-  TFile tree_file("../histo_brut/Li_system_714.root", "READ");
+  TH1D* modele = NULL;
+
+  TFile tree_file(Form("../histo_brut/Li_system_%d.root", run_number), "READ");
+  gROOT->cd();
   TTree* tree = (TTree*)tree_file.Get("Result_tree");
   tree->SetBranchStatus("*",0);
   tree->SetBranchStatus("om_number",1);
@@ -209,15 +261,20 @@ void Fit_Ref() {
   tree->SetBranchStatus("amplitude_tree",1);
   tree->SetBranchAddress("amplitude_tree", &amplitude_tree);
   int n_evt = 0;
-  TH1D* modele = NULL;
+
+  TTree Result_tree("Result_tree","");
+  Result_tree.Branch("om_number", &om_number);
+  Result_tree.Branch("Chi2", &Chi2);
+  Result_tree.Branch("gain", &gain);
+  Result_tree.Branch("gain_error", &gain_error);
+
 
   // auto* can = new TCanvas();
   // can->SetLogy();
-  for (int om = 712; om < 713; om++) {
+  for (int om = 712; om < 717; om++) {
 
     // TH1D *modele = new TH1D ("modele", "", 1024, 0, 200000);
     modele = spectre_charge_full(om);
-
 
     TH1D *spectre_om = new TH1D ("spectre_om", "", 1024, 0, 200000);
         // spectre_om = spectre_charge_full(om);
@@ -237,12 +294,22 @@ void Fit_Ref() {
     //   modele->SetBinError(i, 0);
     // }
 
-    roofitter(modele, spectre_om, om);
+    roofitter(modele, spectre_om, om, rootab);
+    Chi2 = rootab[0];
+    gain = rootab[1];
+    gain_error = rootab[2];
+
+
 
     modele->Reset();
     delete spectre_om;
 
   }
+
+  TFile new_file(Form("root/Fit_Ref_%d.root", run_number), "READ");
+  new_file.cd();
+  Result_tree->Write();
+  new_file.Close();
 
 
   delete modele;
