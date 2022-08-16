@@ -6,3 +6,8 @@
 *image
 histo_brut/
 *stage_Kevin/
+*calcul_gain_ref/roodataset/
+*calcul_gain_ref/root
+*calcul_gain_ref/histo_brut
+*calcul_gain_ref/fit
+*calcul_gain_ref/test

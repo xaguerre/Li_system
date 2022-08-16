@@ -105,7 +105,7 @@ double roofitter(TH1D* modele, TH1D* spectre_om, int om_number, double *rootab, 
   TArrayD limits(nbins+1);
 
   RooRealVar *gain=new RooRealVar("gain","gain",1,0.5,1.5);
-  gain->setBins(1000);
+  gain->setBins(10000);
   RooRealVar *binValue[nbins];
   RooRealVar *binLimValue[nbins+1];
   RooFormulaVar* binLim[nbins+1];//0 = new RooRealVar("binHeight0","bin 0 Value",0.1,0.0,1.0);
@@ -179,9 +179,9 @@ double roofitter(TH1D* modele, TH1D* spectre_om, int om_number, double *rootab, 
   c1->SaveAs(Form("fit/om_%d/run_%d.root", om_number, run_number));
 
   rootab[0] = Chisto->GetMinimum();
-  rootab[1] = Chisto->GetBinContent(Chisto->GetMinimumBin());
-  rootab[2] = ((RooRealVar*)R->floatParsFinal().find(*gain))->getPropagatedError(*R);
-
+  rootab[1] = ((RooRealVar*)R->floatParsFinal().find(*gain))->getVal();
+  rootab[2] = 0.0013;
+  return *rootab;
   delete aPdf;
   delete Chisto;
   delete xFrame;
@@ -301,7 +301,6 @@ void file_merger(std::vector<int> run_number, std::vector<int> time, string prev
       Result_tree.Fill();
     }
   }
-
   else {
     for (int i = 712; i < 717; i++) {
       om_number = i;
