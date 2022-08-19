@@ -139,7 +139,7 @@ void Get_Mean() {
   file.Close();
 }
 
-void fit_all_om_charge(int run_number){
+void fit_all_om_charge(){
   gStyle->SetOptFit(1);
   gStyle->SetOptStat(0);
   TH1::SetDefaultSumw2();
@@ -148,7 +148,7 @@ void fit_all_om_charge(int run_number){
   std::ofstream outFile("Resultats_txt/Resultats_charge.txt");
   std::ifstream parametres("/home/aguerre/Bureau/Thèse/Li_system/Resultats_txt/Resultats_charge_run_547.txt");
 
-  TFile file(Form("Resultats_root/Charge_Li_run_%d.root", run_number),"RECREATE");
+  TFile file("Resultats_root/Charge_Li_run_547_557.root","RECREATE");
 
   double chi = 0;
   int i_om;
@@ -158,7 +158,7 @@ void fit_all_om_charge(int run_number){
   double sigma;
   double  nbg;
   double C = 0;
-
+  int run_number;
   TTree Result_tree("Result_tree","");
   Result_tree.Branch("run_number", &run_number);
   Result_tree.Branch("i_om", &i_om);
@@ -188,106 +188,112 @@ void fit_all_om_charge(int run_number){
   TCanvas* canvas = new TCanvas;
   canvas->SetLogy();
 
-  int k = 3;
   TH2F mean_charge_map("histo_om_mean_charge_map", "mean_charge_map", 20, 0, 20, 13, 0, 13);
-  for(int om = 1; om < 2; om+=1)
-  {
-    int run_number = tab[k];
-    TH1D* spectre_om = spectre_charge(om_tab[om], run_number);
-    spectre_om->Draw();
-    TF1* f_ComptonEdgePoly = new TF1 ("f_ComptonEdgePoly","[0]*(0.5*(1+TMath::Erf(([1]-x)/(TMath::Sqrt(2)*[2]))) + [3]*x + [4])", 40000, 90000);
-    f_ComptonEdgePoly->SetParNames("N_evt","mean_charge","Sigma", "Nbg", "C" );
+  for (int run = 0; run < 4; run++) {
+    for(int om = 0; om < 520; om+=1){
+      run_number = tab[run];
+      TH1D* spectre_om = spectre_charge(om_tab[om], run_number);
+      spectre_om->Draw();
+      TF1* f_ComptonEdgePoly = new TF1 ("f_ComptonEdgePoly","[0]*(0.5*(1+TMath::Erf(([1]-x)/(TMath::Sqrt(2)*[2]))) + [3]*x + [4])", 40000, 90000);
+      f_ComptonEdgePoly->SetParNames("N_evt","mean_charge","Sigma", "Nbg", "C" );
 
-    std::cout << "om = " << om_tab[om] << " and mean = " << mean_tab[om] << " and C = " << C_tab[om] << '\n';
+      std::cout << "om = " << om_tab[om] << " and mean = " << mean_tab[om] << " and C = " << C_tab[om] << '\n';
 
-    f_ComptonEdgePoly->SetParameters(N_evt_tab[om], mean_tab[om], sigma_tab[om], Nbg_tab[om]/N_evt_tab[om], C_tab[om]/N_evt_tab[om]);
-    f_ComptonEdgePoly->SetRange(mean_tab[om]-2.5*sigma_tab[om], mean_tab[om]+2.5*sigma_tab[om]);
-    f_ComptonEdgePoly->SetParLimits(0, 0, 200);
-    f_ComptonEdgePoly->SetParLimits(1, 0, 200000);
-    f_ComptonEdgePoly->SetParLimits(2, 0, 10000);
-    f_ComptonEdgePoly->SetParLimits(3, -10, 0);
-    f_ComptonEdgePoly->SetParLimits(4, 0, 20);
-    f_ComptonEdgePoly->Draw("same");
-    spectre_om->Fit(f_ComptonEdgePoly, "RQ");
-    f_ComptonEdgePoly->SetRange(f_ComptonEdgePoly->GetParameter(1)-2.5*f_ComptonEdgePoly->GetParameter(2),f_ComptonEdgePoly->GetParameter(1)+5*f_ComptonEdgePoly->GetParameter(2));
-    spectre_om->Fit(f_ComptonEdgePoly, "RQ");
-    f_ComptonEdgePoly->SetRange(f_ComptonEdgePoly->GetParameter(1)-2.5*f_ComptonEdgePoly->GetParameter(2),f_ComptonEdgePoly->GetParameter(1)+5*f_ComptonEdgePoly->GetParameter(2));
-    spectre_om->Fit(f_ComptonEdgePoly, "RQ");
+      f_ComptonEdgePoly->SetParameters(N_evt_tab[om], mean_tab[om], sigma_tab[om], Nbg_tab[om]/N_evt_tab[om], C_tab[om]/N_evt_tab[om]);
+      f_ComptonEdgePoly->SetRange(mean_tab[om]-2.5*sigma_tab[om], mean_tab[om]+2.5*sigma_tab[om]);
+      f_ComptonEdgePoly->SetParLimits(0, 0, 200);
+      f_ComptonEdgePoly->SetParLimits(1, 0, 200000);
+      f_ComptonEdgePoly->SetParLimits(2, 0, 10000);
+      f_ComptonEdgePoly->SetParLimits(3, -10, 0);
+      f_ComptonEdgePoly->SetParLimits(4, 0, 20);
+      f_ComptonEdgePoly->Draw("same");
+      spectre_om->Fit(f_ComptonEdgePoly, "RQ");
+      f_ComptonEdgePoly->SetRange(f_ComptonEdgePoly->GetParameter(1)-2.5*f_ComptonEdgePoly->GetParameter(2),f_ComptonEdgePoly->GetParameter(1)+5*f_ComptonEdgePoly->GetParameter(2));
+      spectre_om->Fit(f_ComptonEdgePoly, "RQ");
+      f_ComptonEdgePoly->SetRange(f_ComptonEdgePoly->GetParameter(1)-2.5*f_ComptonEdgePoly->GetParameter(2),f_ComptonEdgePoly->GetParameter(1)+5*f_ComptonEdgePoly->GetParameter(2));
+      spectre_om->Fit(f_ComptonEdgePoly, "RQ");
 
-    i_om = om_tab[om];
-    n_evt = (f_ComptonEdgePoly->GetParameter(0));
-    mean_charge = (f_ComptonEdgePoly->GetParameter(1));
-    sigma = (f_ComptonEdgePoly->GetParameter(2));
-    nbg = (f_ComptonEdgePoly->GetParameter(3));
-    C = (f_ComptonEdgePoly->GetParameter(4));
-    mean_error = f_ComptonEdgePoly->GetParError(1);
-    chi = (f_ComptonEdgePoly->GetChisquare()/f_ComptonEdgePoly->GetNDF());
-    std::cout << "chi = " << chi << '\n';
-    Result_tree.Fill();
-    //mapping
-    int om_col = (om % 13 );
-    int om_row = (om / 13);
-    mean_charge_map.SetBinContent( om_row+1, om_col+1, mean_charge);
+      i_om = om_tab[om];
+      n_evt = (f_ComptonEdgePoly->GetParameter(0));
+      mean_charge = (f_ComptonEdgePoly->GetParameter(1));
+      sigma = (f_ComptonEdgePoly->GetParameter(2));
+      nbg = (f_ComptonEdgePoly->GetParameter(3));
+      C = (f_ComptonEdgePoly->GetParameter(4));
+      mean_error = f_ComptonEdgePoly->GetParError(1);
+      chi = (f_ComptonEdgePoly->GetChisquare()/f_ComptonEdgePoly->GetNDF());
+      std::cout << "chi = " << chi << '\n';
+      Result_tree.Fill();
+      //mapping
+      int om_col = (om % 13 );
+      int om_row = (om / 13);
+      mean_charge_map.SetBinContent( om_row+1, om_col+1, mean_charge);
 
-    canvas->SaveAs(Form("fit/fit_Tl/charge_fit_om_%03d_run_%d.png", om_tab[om], run_number));
+      canvas->SaveAs(Form("fit/fit_Tl/test/charge_fit_om_%03d_run_%d.png", om_tab[om], run_number));
 
-    outFile << i_om << "\t" << n_evt << "\t" << mean_charge << "\t" << sigma << "\t"<< nbg << "\t" << C << endl;
+      outFile << i_om << "\t" << n_evt << "\t" << mean_charge << "\t" << sigma << "\t"<< nbg << "\t" << C << endl;
 
-    delete spectre_om;
-    delete f_ComptonEdgePoly;
+      delete spectre_om;
+      delete f_ComptonEdgePoly;
+    }
   }
+    double comp[520];
 
-  //   double comp[520];
-  //
-  //   for (int i = 0; i < 520; i++) {
-  //     Result_tree.GetEntry(i);
-  //     comp[i] = mean_charge;
-  //     // error1[i] = mean_error;
-  //   }
-  //
-  // double yaxis;
-  // double yaxis_error[4];
-  // double xaxis[4] = {0, 19, 38, 57};
-  // double xaxiserror[4] = {0.5, 0.5, 0.5, 0.5};
-  //     for (int j = 0; j < 520; j++){
-  //       for (int i = 0; i < 4; i++) {
-  //         int nombre = 520*i+j;
-  //         Result_tree.GetEntry(nombre);
-  //         yaxis = mean_charge/comp[j];
-  //         // std::cout << "om = " << j << " and var = " << yaxis << '\n';
-  //         if ((yaxis < 0.9) || (yaxis > 1.1)) {
-  //
-  //           std::cout << " run == " << tab[i] << " om = " << j << " and var = " << yaxis << '\n';
-  //         }
-  //       // yaxis_error[i] = mean_error/comp*1.0 + (mean_charge/(comp*comp))*1.0*error1;
-  //     }
-  //   }
-  // TGraphErrors comp_map (4, xaxis, yaxis, xaxiserror, yaxis_error);
-  //
-  // comp_map.SetNameTitle("fit_Tl", "evolution du gain de l'OM 258");
-  // comp_map.GetXaxis()->SetTitle("Temps (h)");
-  // comp_map.GetYaxis()->SetTitle("Gain(t)/Gain(0)");
-  // comp_map.SetMarkerColor(2);
-  // comp_map.SetMarkerStyle(34);
-  // comp_map.SetMarkerSize(2);
-  //
-  file.cd();
-  // comp_map.Write();
-  mean_charge_map.Write();
-  Result_tree.Write();
+    for (int i = 0; i < 520; i++) {
+      Result_tree.GetEntry(i);
+      comp[i] = mean_charge;
+      // error1[i] = mean_error;
+    }
+    file.cd();
 
-  file.Close();
-  outFile.close();
+    double yaxis[4];
+    double yaxis_error[4];
+    double xaxis[4] = {0, 19, 38, 57};
+    double xaxiserror[4] = {0.5, 0.5, 0.5, 0.5};
+    for (int j = 0; j < 520; j++){
+      for (int i = 0; i < 4; i++) {
+        int nombre = 520*i+j;
+        // int nombre = i;
+        Result_tree.GetEntry(nombre);
+        yaxis[i] = mean_charge/comp[j];
+        // std::cout << "om = " << j << " and var = " << yaxis << '\n';
+        if ((yaxis[i] < 1.1) && (yaxis[i] > 1.05)) {
 
-  return;
-}
+          std::cout << " run == " << tab[i] << " om = " << j << " and var = " << yaxis[i] << '\n';
+        }
+        // yaxis_error[i] = mean_error/comp*1.0 + (mean_charge/(comp*comp))*1.0*error1;
+      }
+      TGraphErrors comp_map (4, xaxis, yaxis, xaxiserror, yaxis_error);
+      comp_map.SetName(Form("fit_Tl_om_%d", j));
+      comp_map.SetNameTitle(Form("fit_Tl_om_%d", j), Form("evolution du gain de l'OM %d", j));
+      comp_map.GetXaxis()->SetTitle("Temps (h)");
+      comp_map.GetYaxis()->SetTitle("Gain(t)/Gain(0)");
+      comp_map.SetMarkerColor(2);
+      comp_map.SetMarkerStyle(34);
+      comp_map.SetMarkerSize(2);
 
 
+      // TCanvas* canvas2 = new TCanvas;
+      // comp_map.Draw();
+      // canvas2->SaveAs(Form("fit/fit_Tl/variation/charge_fit_om_%03d.png", j));
+      comp_map.Write();
+
+    }
+
+
+
+
+    mean_charge_map.Write();
+    Result_tree.Write();
+
+    file.Close();
+    outFile.close();
+
+    return;
+  }
 
 double* om_gain_fit(int om, int run_number){
   gStyle->SetOptFit(1);
   gStyle->SetOptStat(0);
-
 
   TFile file(Form("Resultats_root/Ampl_Tl_run_%d.root", run_number),"RECREATE");
 
@@ -382,110 +388,6 @@ canvas->SaveAs(Form("fit/fit_Tl/amplitude/amplitude_fit_om_%d_run_.png", om));
   tab[2] = chin;
   return tab;
 }
-
-// void fit_all_om_amplitude(int run_number){
-//   Load_spectre(run_number);
-//   gStyle->SetOptFit(1);
-//   gStyle->SetOptStat(0);
-//   TH1::SetDefaultSumw2();
-//   TH2::SetDefaultSumw2();
-//
-//   std::ofstream outFile("Resultats_txt/Resultats_amplitude.txt");
-//   std::ifstream parametres("/home/aguerre/Bureau/Thèse/Li_system/Resultats_txt/Resultats_ampl_tot.txt");
-//
-//   TFile file(Form("Resultats_root/amplitude_Li_run_%d.root", run_number),"RECREATE");
-//
-//   double chi = 0;
-//   int i_om;
-//   double n_evt;
-//   double mean_amplitude;
-//   double mean_error;
-//   double sigma;
-//   double  nbg;
-//   double C = 0;
-//
-//   TTree Result_tree("Result_tree","");
-//   Result_tree.Branch("run_number", &run_number);
-//   Result_tree.Branch("i_om", &i_om);
-//   Result_tree.Branch("n_evt", &n_evt);
-//   Result_tree.Branch("mean_amplitude", &mean_amplitude);
-//   Result_tree.Branch("mean_error", &mean_error);
-//   Result_tree.Branch("sigma", &sigma);
-//   Result_tree.Branch("C", &C);
-//   Result_tree.Branch("nbg", &nbg);
-//   Result_tree.Branch("chi", chi);
-//
-//   int om_tab[712];
-//   double N_evt_tab[712];
-//   double mean_tab[712];
-//   double sigma_tab[712];
-//   double Nbg_tab[712];
-//   double C_tab[712];
-//   int compteur = 0;
-//
-//   while(parametres >> om_tab[compteur])  // tant que l'on peut mettre la ligne dans "contenu"
-//   {
-//     parametres >> N_evt_tab[compteur] >> mean_tab[compteur] >> sigma_tab[compteur] >> Nbg_tab[compteur] >> C_tab[compteur];
-//     compteur++;
-//   }
-//
-//   TCanvas* canvas = new TCanvas;
-//   canvas->SetLogy();
-//
-//   for(int om = 12; om < 13; om+=1)
-//   {
-//     TH1D* spectre_om = spectre_amplitude(om_tab[om]);
-//     spectre_om->Draw();
-//     TF1* f_ComptonEdgePoly = new TF1 ("f_ComptonEdgePoly","[0]*(0.5*(1+TMath::Erf(([1]-x)/(TMath::Sqrt(2)*[2]))) + [3]*x + [4])", 400, 900);
-//     f_ComptonEdgePoly->SetParNames("N_evt","mean_amplitude","Sigma", "Nbg", "C" );
-//
-//     std::cout << "om = " << om_tab[om] << " and mean = " << mean_tab[om] << " and C = " << C_tab[om] << '\n';
-//
-//     f_ComptonEdgePoly->SetParameters(N_evt_tab[om], mean_tab[om], sigma_tab[om], Nbg_tab[om]/N_evt_tab[om], C_tab[om]/N_evt_tab[om]);
-//     // f_ComptonEdgePoly->SetRange(mean_tab[om]-2.5*sigma_tab[om], mean_tab[om]+2.5*sigma_tab[om]);
-//     f_ComptonEdgePoly->SetParLimits(0, 0, 2);
-//     f_ComptonEdgePoly->SetParLimits(1, 0, 2000);
-//     f_ComptonEdgePoly->SetParLimits(2, 0, 100);
-//     f_ComptonEdgePoly->SetParLimits(3, -10, 0);
-//     f_ComptonEdgePoly->SetParLimits(4, 0, 20);
-//     f_ComptonEdgePoly->Draw("same");
-//     spectre_om->Fit(f_ComptonEdgePoly, "RQ");
-//     f_ComptonEdgePoly->SetRange(f_ComptonEdgePoly->GetParameter(1)-2.5*f_ComptonEdgePoly->GetParameter(2),f_ComptonEdgePoly->GetParameter(1)+5*f_ComptonEdgePoly->GetParameter(2));
-//     spectre_om->Fit(f_ComptonEdgePoly, "RQ");
-//     f_ComptonEdgePoly->SetRange(f_ComptonEdgePoly->GetParameter(1)-2.5*f_ComptonEdgePoly->GetParameter(2),f_ComptonEdgePoly->GetParameter(1)+5*f_ComptonEdgePoly->GetParameter(2));
-//     spectre_om->Fit(f_ComptonEdgePoly, "RQ");
-//
-//     i_om = om_tab[om];
-//     n_evt = (f_ComptonEdgePoly->GetParameter(0));
-//     mean_amplitude = (f_ComptonEdgePoly->GetParameter(1));
-//     sigma = (f_ComptonEdgePoly->GetParameter(2));
-//     nbg = (f_ComptonEdgePoly->GetParameter(3));
-//     C = (f_ComptonEdgePoly->GetParameter(4));
-//     mean_error = f_ComptonEdgePoly->GetParError(1);
-//     chi = (f_ComptonEdgePoly->GetChisquare()/f_ComptonEdgePoly->GetNDF());
-//     std::cout << "chi = " << chi << '\n';
-//     Result_tree.Fill();
-//     //mapping
-//     int om_col = (om % 13 );
-//     int om_row = (om / 13);
-//
-//     canvas->SaveAs(Form("fit/fit_Tl/amplitude/amplitude_fit_om_%d_run_%d.png", om, run_number));
-//
-//     outFile << i_om << "\t" << n_evt << "\t" << mean_amplitude << "\t" << sigma << "\t"<< nbg << "\t" << C << endl;
-//
-//     delete spectre_om;
-//     delete f_ComptonEdgePoly;
-//   }
-//
-//   file.cd();
-//   Result_tree.Write();
-//
-//   file.Close();
-//   outFile.close();
-//
-//   return;
-// }
-//
 
 int pic_number(double temps){
   int pic_number = 0;
@@ -1100,6 +1002,64 @@ void file_merger(std::vector<int> run, std::vector<int> run_ref, string addfile 
   newfile->Close();
 
 }
+
+void TGrapher() {
+      double comp[520];
+
+    for (int i = 0; i < 520; i++) {
+      Result_tree.GetEntry(i);
+      comp[i] = mean_charge;
+      // error1[i] = mean_error;
+    }
+    file.cd();
+
+    double yaxis[4];
+    double yaxis_error[4];
+    double xaxis[4] = {0, 19, 38, 57};
+    double xaxiserror[4] = {0.5, 0.5, 0.5, 0.5};
+    for (int j = 0; j < 520; j++){
+      for (int i = 0; i < 4; i++) {
+        int nombre = 520*i+j;
+        // int nombre = i;
+        Result_tree.GetEntry(nombre);
+        yaxis[i] = mean_charge/comp[j];
+        // std::cout << "om = " << j << " and var = " << yaxis << '\n';
+        if ((yaxis[i] < 1.1) && (yaxis[i] > 1.05)) {
+
+          std::cout << " run == " << tab[i] << " om = " << j << " and var = " << yaxis[i] << '\n';
+        }
+        // yaxis_error[i] = mean_error/comp*1.0 + (mean_charge/(comp*comp))*1.0*error1;
+      }
+      TGraphErrors comp_map (4, xaxis, yaxis, xaxiserror, yaxis_error);
+      comp_map.SetName(Form("fit_Tl_om_%d", j));
+      comp_map.SetNameTitle(Form("fit_Tl_om_%d", j), Form("evolution du gain de l'OM %d", j));
+      comp_map.GetXaxis()->SetTitle("Temps (h)");
+      comp_map.GetYaxis()->SetTitle("Gain(t)/Gain(0)");
+      comp_map.SetMarkerColor(2);
+      comp_map.SetMarkerStyle(34);
+      comp_map.SetMarkerSize(2);
+
+
+      // TCanvas* canvas2 = new TCanvas;
+      // comp_map.Draw();
+      // canvas2->SaveAs(Form("fit/fit_Tl/variation/charge_fit_om_%03d.png", j));
+      comp_map.Write();
+
+    }
+
+
+
+
+    mean_charge_map.Write();
+    Result_tree.Write();
+
+    file.Close();
+    outFile.close();
+
+    return;
+
+}
+
 
 int main(int argc, char const *argv[]){
   int n_run, run, t;

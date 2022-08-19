@@ -64,8 +64,6 @@ using namespace std;
 
 RooRealVar charge_tree("charge_tree","charge_tree",0,2e5);
 
-RooDataSet *SetTable[200][5];
-
 TH2F* charge_spectre = NULL;
 TH2F* charge_spectre_template = NULL;
 
@@ -147,9 +145,9 @@ double roofitter(TH1D* modele, TH1D* spectre_om, int om_number, double *rootab, 
   rootab[0] =Chi2;
   TLatex l;
   l.SetTextFont(40);
-  l.DrawLatex(90000, 80, Form("Khi2/NDF = %.2f", Chi2));
+  l.DrawLatex(90000, 80, Form("Khi2 = %.2f", Chi2));
   // return *rootab;
-  can->SaveAs(Form("fit/variation_run_time_716/fit_om_%d_gain_%f.png"/*, om_number*/, om_number, gain));
+  can->SaveAs(Form("fit/test_full/fit_om_%d_gain_%f.png"/*, om_number*/, om_number, gain));
 
   delete miniChi;
   delete can;
@@ -178,11 +176,11 @@ void Fit_Ref(int run_number) {
   Result_tree.Branch("nsrun", &compteur);
   for (om_number = 712; om_number < 717; om_number++) {
     TH2modele = spectre_charge_full_template(om_number);
-    // for (compteur = 1; compteur < 60; compteur++) {
+    for (compteur = 1; compteur < 60; compteur++) {
     TH1D* spectre_om = NULL;
-    // TFile *file = new TFile(Form("histo_brut/716/time_file_%d.root", compteur+165), "READ");
+    TFile *file = new TFile(Form("histo_brut/716/file_%d.root", compteur+165), "READ");
     // TFile *file = new TFile(Form("histo_brut/histo_ref_%d.root", run_number), "READ");
-    // gROOT->cd();
+    gROOT->cd();
     spectre_om = spectre_charge(om_number);
     for (int gain_count = 1; gain_count <2001; gain_count++) {
       gain = (gain_bin_min + gain_bin_width*(gain_count-1));
@@ -206,10 +204,11 @@ void Fit_Ref(int run_number) {
     }
 
     delete spectre_om;
-    // }
+    }
 
   }
-  TFile new_file(Form("root/Fit_Ref_%d.root", run_number), "RECREATE");
+  // TFile new_file(Form("root/Fit_Ref_%d.root", run_number), "RECREATE");
+  TFile new_file(Form("root/Complete_Fit/Fit_Ref_%d.root", run_number), "RECREATE");
   new_file.cd();
   Result_tree.Write();
   new_file.Close();
@@ -218,11 +217,79 @@ void Fit_Ref(int run_number) {
 
 }
 
+void minimum_calculator(string file_name) {
+  TFile file(Form("root/Complete_Fit/%s", file_name.c_str()), "READ");
+  gROOT->cd();
+  double PolChi2, Chi2, gain, mingain, minChi2, gainmin, chi2min;
+  int om_number, nsrun;
+
+  TTree Result_tree("Result_tree","");
+  Result_tree.Branch("om_number", &om_number);
+  Result_tree.Branch("PolChi2", &PolChi2);
+  Result_tree.Branch("gainmin", &gainmin);
+  Result_tree.Branch("chi2min", &chi2min);
+  Result_tree.Branch("nsrun", &nsrun);
+
+  TTree* tree = (TTree*)file.Get("Result_tree");
+  tree->SetBranchStatus("*",0);
+  tree->SetBranchStatus("om_number",1);
+  tree->SetBranchAddress("om_number", &om_number);
+  tree->SetBranchStatus("Chi2",1);
+  tree->SetBranchAddress("Chi2", &Chi2);
+  tree->SetBranchStatus("gain",1);
+  tree->SetBranchAddress("gain", &gain);
+  tree->SetBranchStatus("nsrun",1);
+  tree->SetBranchAddress("nsrun", &nsrun);
+
+  for (int i = 1; i < 30; i++) {
+    minChi2 = 10000;
+    for (int j = 0; j < tree->GetEntries(); j++) {
+      tree->GetEntry(j);
+      if (nsrun == i) {
+        if (minChi2 > Chi2) {
+          minChi2 = Chi2;
+          mingain = gain;
+        }
+      }
+    }
+
+    TF1* poly = new TF1 ("poly", "pol2", mingain - 0.005, mingain + 0.005);
+    std::cout << "mingain = " << mingain << '\n';
+    TH2D *Chi2gain = new TH2D ("Chi2gain", "", 1000, 0.99, 1.01, 1000, 0, 1000);
+    tree->Project("Chi2gain", "Chi2:gain", Form("nsrun == %d", i));
+    TCanvas* can = new TCanvas;
+    can->cd();
+    Chi2gain->Draw();
+
+    poly->Draw("same");
+    Chi2gain->Fit(poly, "RQ");
+
+    PolChi2 = poly->GetChisquare();
+    std::cout << "min = " << poly->GetMinimum() << " ; " << poly->GetMinimumX() << '\n';
+    gainmin = poly->GetMinimumX();
+    chi2min = poly->GetMinimum();
+    nsrun = i;
+    Result_tree.Fill();
+
+    can->SaveAs(Form("fit/fit_Chi2/fit_om_%d_part_%d.png", om_number, i));
+
+    delete can;
+    delete Chi2gain;
+    delete poly;
+  }
+
+  TFile newfile(Form("root/Best_Fit/%s_mini.root", file_name.c_str(), "RECREATE");
+  newfile.cd();
+  Result_tree.Write();
+  newfile.Close();
+
+}
+
 std::vector<int> vtime = {1655219940, 1656339281, 1656427367, 1656513370, 1656596183, 1656689629, 1656772061, 1656856728, 1658395987, 1658995707, 1659445339, 1660034367};
 std::vector<int> vrun_number = {736, 737, 738, 739, 740, 741, 742};
 
 void file_merger(std::vector<int> run_number, std::vector<int> time, string previous_file_s = "") {
-  TFile file(Form("root/Fit_Ref_%d-%d.root", run_number.at(0), run_number.at(run_number.size()-1)), "RECREATE");
+  TFile file(Form("root/Merged_Fit/Fit_Ref_%d-%d.root", run_number.at(0), run_number.at(run_number.size()-1)), "RECREATE");
 
   double Chi2, gain, gain_error;
   int om_number, int_run;
@@ -270,7 +337,7 @@ void file_merger(std::vector<int> run_number, std::vector<int> time, string prev
   }
 
   for (int i = 0; i < run_number.size(); i++) {
-    TFile tree_file(Form("root/Fit_Ref_%d.root", run_number.at(i)), "READ");
+    TFile tree_file(Form("root/Best_Fit/Fit_Ref_mini_%d.root", run_number.at(i)), "READ");
 
     TTree* tree = (TTree*)tree_file.Get("Result_tree");
     tree->SetBranchStatus("*",0);
@@ -298,9 +365,9 @@ void file_merger(std::vector<int> run_number, std::vector<int> time, string prev
 
 void TGrapher(std::string file_name, int n_run) {
 
-  TFile file(Form("root/TGraph_%s.root", file_name.c_str()), "RECREATE");
+  TFile file(Form("root/TGraph/TGraph_%s.root", file_name.c_str()), "RECREATE");
 
-  TFile tree_file(Form("root/%s.root", file_name.c_str()), "READ");
+  TFile tree_file(Form("root/Merged_Fit/%s.root", file_name.c_str()), "READ");
   double int_time;
   int om_number, run_number;
   double gain;
@@ -360,6 +427,94 @@ void TGrapher(std::string file_name, int n_run) {
   file.Close();
 }
 
+void comparator(){
+
+  TFile file("variation_gain/variation_gain_716.root", "READ");
+  gROOT->cd();
+  double Chi2, gain, mingain, minChi2, gainmin, measured_gain, fitted_gain;
+  double measured_min[29], fitted_min[29];
+  int om_number, nsrun;
+
+  TTree Result_tree("Result_tree","");
+  Result_tree.Branch("om_number", &om_number);
+  Result_tree.Branch("Chi2", &Chi2);
+  Result_tree.Branch("measuredgain", &measured_gain);
+  Result_tree.Branch("fittedgain", &fitted_gain);
+  Result_tree.Branch("nsrun", &nsrun);
+
+  TTree* tree = (TTree*)file.Get("Result_tree");
+  tree->SetBranchStatus("*",0);
+  tree->SetBranchStatus("om_number",1);
+  tree->SetBranchAddress("om_number", &om_number);
+  tree->SetBranchStatus("Chi2",1);
+  tree->SetBranchAddress("Chi2", &Chi2);
+  tree->SetBranchStatus("gain",1);
+  tree->SetBranchAddress("gain", &gain);
+  tree->SetBranchStatus("nsrun",1);
+  tree->SetBranchAddress("nsrun", &nsrun);
+
+
+  TH2D *Measuredgain = new TH2D ("Measuredgain", "", 1000, 0, 29, 1000, 0.99, 1.01);
+  for (int i = 1; i < 30; i++) {
+    minChi2 = 10000;
+    for (int j = 0; j < tree->GetEntries(); j++) {
+      tree->GetEntry(j);
+      if (nsrun == i) {
+        if (minChi2 > Chi2) {
+          minChi2 = Chi2;
+          mingain = gain;
+        }
+      }
+      measured_min[i] = mingain;
+    }
+    Measuredgain->Fill(i, measured_min[i]);
+    std::cout << i << '\n';
+  }
+
+  TFile file2("root/Fittedgain.root", "READ");
+  gROOT->cd();
+  TTree* tree2 = (TTree*)file2.Get("Result_tree");
+  tree2->SetBranchStatus("*",0);
+  tree2->SetBranchStatus("om_number",1);
+  tree2->SetBranchAddress("om_number", &om_number);
+  tree2->SetBranchStatus("gainmin",1);
+  tree2->SetBranchAddress("gainmin", &gainmin);
+  tree2->SetBranchStatus("nsrun",1);
+  tree2->SetBranchAddress("nsrun", &nsrun);
+  TH2D *Tcomparator = new TH2D ("Chi2gain", "", 1000, 0, 29, 1000, -0.01, 0.01);
+  TH2D *Fittedgain = new TH2D ("Fittedgain", "", 1000, 0, 29, 1000,  0.99, 1.01);
+  for (int i = 0; i < tree2->GetEntries(); i++) {
+    tree2->GetEntry(i);
+    Tcomparator->Fill(nsrun, measured_min[i]-gainmin);
+    Fittedgain->Fill(nsrun, gainmin);
+
+    measured_gain = measured_min[i];
+    fitted_gain = gainmin;
+    Result_tree.Fill();
+
+  }
+  Tcomparator->Draw();
+  Tcomparator->SetMarkerStyle(2);
+  TCanvas* c = new TCanvas;
+  Measuredgain->Draw();
+  Measuredgain->SetMarkerStyle(2);
+  Measuredgain->SetMarkerColor(4);
+  Fittedgain->Draw("same");
+  Fittedgain->SetMarkerStyle(4);
+  Fittedgain->SetMarkerColor(2);
+
+  TFile newfile("root/comparator.root", "RECREATE");
+  newfile.cd();
+  Tcomparator->Write();
+  Measuredgain->Write();
+  Fittedgain->Write();
+  Result_tree.Write();
+  newfile.Close();
+  return;
+}
+
+
+
 int main(int argc, char const *argv[]) {
   int n_run, run, t;
   std::vector<int> run_number, time, ref_run_number, ref_time;
@@ -399,6 +554,7 @@ int main(int argc, char const *argv[]) {
 
     for (int i = 0; i < n_run; i++) {
       Fit_Ref(run_number.at(i));
+      minimum_calculator(Form("Fit_Ref_%d", run_number.at(i)));
     }
     std::cout << "Fit_Ref ok" << '\n';
 
@@ -430,6 +586,7 @@ int main(int argc, char const *argv[]) {
 
     for (int i = 0; i < n_run; i++) {
       Fit_Ref(run_number.at(i));
+      minimum_calculator(Form("Fit_Ref_%d", run_number.at(i)));
     }
     std::cout << "Fit_Ref ok" << '\n';
 
