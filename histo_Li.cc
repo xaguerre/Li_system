@@ -267,6 +267,7 @@ void fit_all_om_charge(){
       comp_map.SetNameTitle(Form("fit_Tl_om_%d", j), Form("evolution du gain de l'OM %d", j));
       comp_map.GetXaxis()->SetTitle("Temps (h)");
       comp_map.GetYaxis()->SetTitle("Gain(t)/Gain(0)");
+      comp_map.GetXaxis()->SetTimeDisplay(1);
       comp_map.SetMarkerColor(2);
       comp_map.SetMarkerStyle(34);
       comp_map.SetMarkerSize(2);
@@ -447,7 +448,7 @@ void fit_LI_amplitude(int run_number, int time2 = 0){
   int i_om;
   double constante;
   double mean, time;
-  double mean_error;
+  double mean_error, nevent;
   double sigma;
   int pic =0;
   double Khi2 = 0;
@@ -464,15 +465,16 @@ void fit_LI_amplitude(int run_number, int time2 = 0){
   Result_tree.Branch("run_number", &run_number);
   Result_tree.Branch("intensity", &intensity);
   Result_tree.Branch("time", &time2);
-
+  Result_tree.Branch("nevent", &nevent);
   double debut = 0;
   TCanvas* canvas = new TCanvas;
   TH1F comp_map("comp_map", "comp_map", 100, 0, 100);
-  TFile tree_file(Form("histo_brut/histo_Li_system_%d.root", run_number), "READ");
+  TFile tree_file(Form("histo_brut/Li_system_%d.root", run_number), "READ");
   int om_number;
   double charge_tree;
   double amplitude_tree;
   TTree* tree = (TTree*)tree_file.Get("Result_tree");
+  gROOT->cd();
   tree->SetBranchStatus("*",0);
   tree->SetBranchStatus("om_number",1);
   tree->SetBranchAddress("om_number", &om_number);
@@ -485,7 +487,7 @@ void fit_LI_amplitude(int run_number, int time2 = 0){
   int n_evt = 0;
   while (n_evt < 100) {
     TH1D *spectre = new TH1D ("spectre_amplitude", "", 700, 0, 2300);
-    tree->Project("spectre_amplitude", "amplitude_tree", Form("om_number == 1 && time < %f  && amplitude_tree > 10", debut));
+    tree->Project("spectre_amplitude", "amplitude_tree", Form("om_number == 800 && time < %f  && amplitude_tree > 10", debut));
     debut++;
 
     n_evt = spectre->GetEntries();
@@ -529,6 +531,7 @@ void fit_LI_amplitude(int run_number, int time2 = 0){
         delete spectre;
       }
       else{
+        nevent = spectre->Integral();
         TF1 *f_Gaus = new TF1("f_Gaus", "gaus(0)", 0, 1200);
         f_Gaus->SetParNames("N_evt","mean_charge","Sigma");
         // f_Gaus->SetParameters(25, spectre->GetMean(), 100);
@@ -1003,63 +1006,63 @@ void file_merger(std::vector<int> run, std::vector<int> run_ref, string addfile 
 
 }
 
-void TGrapher() {
-      double comp[520];
-
-    for (int i = 0; i < 520; i++) {
-      Result_tree.GetEntry(i);
-      comp[i] = mean_charge;
-      // error1[i] = mean_error;
-    }
-    file.cd();
-
-    double yaxis[4];
-    double yaxis_error[4];
-    double xaxis[4] = {0, 19, 38, 57};
-    double xaxiserror[4] = {0.5, 0.5, 0.5, 0.5};
-    for (int j = 0; j < 520; j++){
-      for (int i = 0; i < 4; i++) {
-        int nombre = 520*i+j;
-        // int nombre = i;
-        Result_tree.GetEntry(nombre);
-        yaxis[i] = mean_charge/comp[j];
-        // std::cout << "om = " << j << " and var = " << yaxis << '\n';
-        if ((yaxis[i] < 1.1) && (yaxis[i] > 1.05)) {
-
-          std::cout << " run == " << tab[i] << " om = " << j << " and var = " << yaxis[i] << '\n';
-        }
-        // yaxis_error[i] = mean_error/comp*1.0 + (mean_charge/(comp*comp))*1.0*error1;
-      }
-      TGraphErrors comp_map (4, xaxis, yaxis, xaxiserror, yaxis_error);
-      comp_map.SetName(Form("fit_Tl_om_%d", j));
-      comp_map.SetNameTitle(Form("fit_Tl_om_%d", j), Form("evolution du gain de l'OM %d", j));
-      comp_map.GetXaxis()->SetTitle("Temps (h)");
-      comp_map.GetYaxis()->SetTitle("Gain(t)/Gain(0)");
-      comp_map.SetMarkerColor(2);
-      comp_map.SetMarkerStyle(34);
-      comp_map.SetMarkerSize(2);
-
-
-      // TCanvas* canvas2 = new TCanvas;
-      // comp_map.Draw();
-      // canvas2->SaveAs(Form("fit/fit_Tl/variation/charge_fit_om_%03d.png", j));
-      comp_map.Write();
-
-    }
-
-
-
-
-    mean_charge_map.Write();
-    Result_tree.Write();
-
-    file.Close();
-    outFile.close();
-
-    return;
-
-}
-
+// void TGrapher() {
+//       double comp[520];
+//
+//     for (int i = 0; i < 520; i++) {
+//       Result_tree.GetEntry(i);
+//       comp[i] = mean_charge;
+//       // error1[i] = mean_error;
+//     }
+//     file.cd();
+//
+//     double yaxis[4];
+//     double yaxis_error[4];
+//     double xaxis[4] = {0, 19, 38, 57};
+//     double xaxiserror[4] = {0.5, 0.5, 0.5, 0.5};
+//     for (int j = 0; j < 520; j++){
+//       for (int i = 0; i < 4; i++) {
+//         int nombre = 520*i+j;
+//         // int nombre = i;
+//         Result_tree.GetEntry(nombre);
+//         yaxis[i] = mean_charge/comp[j];
+//         // std::cout << "om = " << j << " and var = " << yaxis << '\n';
+//         if ((yaxis[i] < 1.1) && (yaxis[i] > 1.05)) {
+//
+//           std::cout << " run == " << tab[i] << " om = " << j << " and var = " << yaxis[i] << '\n';
+//         }
+//         // yaxis_error[i] = mean_error/comp*1.0 + (mean_charge/(comp*comp))*1.0*error1;
+//       }
+//       TGraphErrors comp_map (4, xaxis, yaxis, xaxiserror, yaxis_error);
+//       comp_map.SetName(Form("fit_Tl_om_%d", j));
+//       comp_map.SetNameTitle(Form("fit_Tl_om_%d", j), Form("evolution du gain de l'OM %d", j));
+//       comp_map.GetXaxis()->SetTitle("Temps (h)");
+//       comp_map.GetYaxis()->SetTitle("Gain(t)/Gain(0)");
+//       comp_map.SetMarkerColor(2);
+//       comp_map.SetMarkerStyle(34);
+//       comp_map.SetMarkerSize(2);
+//
+//
+//       // TCanvas* canvas2 = new TCanvas;
+//       // comp_map.Draw();
+//       // canvas2->SaveAs(Form("fit/fit_Tl/variation/charge_fit_om_%03d.png", j));
+//       comp_map.Write();
+//
+//     }
+//
+//
+//
+//
+//     mean_charge_map.Write();
+//     Result_tree.Write();
+//
+//     file.Close();
+//     outFile.close();
+//
+//     return;
+//
+// }
+//
 
 int main(int argc, char const *argv[]){
   int n_run, run, t;
@@ -1093,29 +1096,29 @@ int main(int argc, char const *argv[]){
   }
   compteur = 0;
   n_run = 0;
-  std::cout << "How many Ref run do you want ?" << '\n';
-  std::cin >> n_run;
-  std::cout << "Write the Ref OM only runs you want" << '\n';
-  while (compteur < n_run && cin >> run) {
-    ref_run_number.push_back(run);
-    std::cout << "Write the delay between the runs (0 for the first)" << '\n';
-    while (compteur < n_run && cin >> t) {
-      ref_time.push_back(t);
-      break;
-    }
-    compteur++;
-    if (compteur < n_run) {
-      std::cout << "Write the Ref runs you want" << '\n';
-    }
-  }
+  // std::cout << "How many Ref run do you want ?" << '\n';
+  // std::cin >> n_run;
+  // std::cout << "Write the Ref OM only runs you want" << '\n';
+  // while (compteur < n_run && cin >> run) {
+  //   ref_run_number.push_back(run);
+  //   std::cout << "Write the delay between the runs (0 for the first)" << '\n';
+  //   while (compteur < n_run && cin >> t) {
+  //     ref_time.push_back(t);
+  //     break;
+  //   }
+  //   compteur++;
+  //   if (compteur < n_run) {
+  //     std::cout << "Write the Ref runs you want" << '\n';
+  //   }
+  // }
   std::cout << "Code start running" << '\n';
 
   for (int i = 0; i < run_number.size(); i++) {
     fit_LI_amplitude(run_number[i], time[i]);
   }
-  for (int i = 0; i < ref_run_number.size(); i++) {
-    fit_ref(ref_run_number[i], ref_time[i]);
-  }
+  // for (int i = 0; i < ref_run_number.size(); i++) {
+  //   fit_ref(ref_run_number[i], ref_time[i]);
+  // }
   if (add == false) {
     file_merger(run_number, ref_run_number);
   }
