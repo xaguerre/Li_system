@@ -162,7 +162,7 @@ void Fit_Ref(int run_number) {
   // Load_spectre(run_number);
   TH1::SetDefaultSumw2();
 
-  double Chi2, gain, gain_error;
+  double Chi2, gain, gain_error, ndf;
   int om_number, compteur;
   double* rootab = new double[3];
 
@@ -175,6 +175,7 @@ void Fit_Ref(int run_number) {
   Result_tree.Branch("gain_error", &gain_error);
   Result_tree.Branch("run_number", &run_number);
   Result_tree.Branch("nsrun", &compteur);
+  Result_tree.Branch("ndf", &ndf);
 
   for (om_number = 712; om_number < 717; om_number++) {
 
@@ -237,6 +238,7 @@ void Fit_Ref(int run_number) {
         Chi2min = Chi2;
       }
       modele->Reset();
+
     }
     // gainmin = 1000;
     for (int gain_count = gainmin - 200; gain_count < gainmin + 200; gain_count++) {
@@ -262,6 +264,15 @@ void Fit_Ref(int run_number) {
         k++;
       }
       // }
+
+      int compte = 0;
+      for (int i = 0; i < 1000; i++) {
+          if (spectre_om->GetBinContent(i) > 0) {
+            compte++;
+          }
+      }
+      ndf = compte - 1;
+
       roofitter(modele, spectre_om, om_number, rootab, run_number, gain, 2);
 
       Chi2 = rootab[0];
@@ -285,20 +296,22 @@ void Fit_Ref(int run_number) {
 
 }
 
-void minerror_calculator(string file_name) {
-  TFile file(Form("root/split_time/Complete_Fit/%s.root", file_name.c_str()), "READ");
+void minerror_calculator(string file_name, int run_number) {
+  TFile file(Form("root/multisplit/Complete_Fit/%s_789.root", file_name.c_str()), "READ");
   gROOT->cd();
-  double PolChi2, Chi2, gain, gainmin, chi2min, error_plus, error_moins;
-  int om_number, nsrun;
-
+  double PolChi2, Chi2, gain, gainmin, chi2min, error_plus, error_moins, minChi2, mingain_tree;
+  int om_number, nsrun, ndf;
+  int i;
   TTree Result_tree("Result_tree","");
-  Result_tree.Branch("om_number", &om_number);
+  Result_tree.Branch("om_number", &i);
   Result_tree.Branch("PolChi2", &PolChi2);
   Result_tree.Branch("gainmin", &gainmin);
   Result_tree.Branch("chi2min", &chi2min);
   Result_tree.Branch("nsrun", &nsrun);
   Result_tree.Branch("error_moins", &error_moins);
   Result_tree.Branch("error_plus", &error_plus);
+  Result_tree.Branch("mingain_tree", &mingain_tree);
+  Result_tree.Branch("ndf", &ndf);
 
   TTree* tree = (TTree*)file.Get("Result_tree");
   tree->SetBranchStatus("*",0);
@@ -310,68 +323,73 @@ void minerror_calculator(string file_name) {
   tree->SetBranchAddress("gain", &gain);
   tree->SetBranchStatus("nsrun",1);
   tree->SetBranchAddress("nsrun", &nsrun);
+  tree->SetBranchStatus("ndf",1);
+  tree->SetBranchAddress("ndf", &ndf);
 
-
+  TFile newfile(Form("root/multisplit/Best_Fit/%s_mini_789.root", file_name.c_str()), "RECREATE");
+  gROOT->cd();
   float entry = 0;
-  // for (int i = 0; i < 30; i+=1) {
-  for (int i = 0; i < 5; i++) {
-    chi2min = 10000;
+
+  for (i = 712; i < 717; i++) {
+
+    minChi2 = 10000;
     for (int j = 0; j < tree->GetEntries(); j++) {
       tree->GetEntry(j);
-      if (chi2min > Chi2 && om_number == i + 712) {
-        entry = j;
-        chi2min = Chi2;
-        gainmin = gain;
+      if (om_number == i) {
+        if (minChi2 > Chi2) {
+          minChi2 = Chi2;
+          gainmin = gain;
+        }
       }
     }
-    double compteur = 0;
-    double gain2 = 1e6;
-    std::cout << "gainmin = " << gainmin << '\n';
-    while (compteur < (chi2min + 25) || gain2 < (gainmin + 0.01)) {
-      std::cout << "entry = " << compteur << '\n';
-      tree->GetEntry(entry);
-      compteur = Chi2;
-      gain2 = gain;
-      std::cout << "gainmin = " << gain2 << '\n';
 
-      error_plus = abs(gainmin-gain);
-      entry++;
-    }
-    // std::cout << "error plus = " << error_plus << '\n';
-    compteur = 0;
-    while (compteur < chi2min + 25 || gain2 > gainmin - 0.01) {
-      tree->GetEntry(entry);
-      compteur = Chi2;
-      gain2 = gain;
-      error_moins = abs(gainmin-gain);
-      entry--;
-    }
-    // std::cout << "error moins = " << error_moins << '\n';
-    om_number = i + 712;
+    // ndf = ndf_counter(i, run_number)-1;
+
+    mingain_tree = gainmin;
+    TF1* poly = new TF1 ("poly", "pol2", gainmin - 0.01, gainmin + 0.01);
+    std::cout << "gainmin = " << gainmin << '\n';
+    TH2D *Chi2gain = new TH2D ("Chi2gain", "", 1000, gainmin - 0.1, gainmin + 0.1, 1000, 0, 1000);
+    tree->Project("Chi2gain", "Chi2:gain", Form("om_number == %d", i));
+
+    TCanvas* can = new TCanvas;
+    can->cd();
+    Chi2gain->Draw();
+
+    poly->Draw("same");
+    Chi2gain->Fit(poly, "RQ");
+    PolChi2 = poly->GetChisquare();
+    gainmin = poly->GetMinimumX();
+    chi2min = poly->GetMinimum();
+    error_plus = poly->GetX(poly->GetMinimum()+1, poly->GetMinimumX(), poly->GetMinimumX() + 0.05) - poly->GetMinimumX();
+    error_moins = poly->GetMinimumX() - poly->GetX(poly->GetMinimum()+1, poly->GetMinimumX() - 0.05, poly->GetMinimumX());
+    std::cout << "min = " << poly->GetMinimum() << " ; " << poly->GetMinimumX() << " + " << error_plus << " - " << error_moins << '\n';
+    std::cout << "Chi2 = " << PolChi2 << '\n';
+    can->SaveAs(Form("fit/multisplit/om_%d/run_%d/fit_Chi2_gain.png", i, run_number));
+
     Result_tree.Fill();
+    delete Chi2gain;
+    delete poly;
+  }
+
+    newfile.cd();
+    Result_tree.Write();
+    newfile.Close();
 
   }
 
-  TFile newfile(Form("root/split_time/Best_Fit/%s_mini.root", file_name.c_str()), "RECREATE");
-  newfile.cd();
-  Result_tree.Write();
-  newfile.Close();
-
-}
-
 // std::vector<int> vtime = {1655219940, 1656339281, 1656427367, 1656513370, 1656596183, 1656689629, 1656772061, 1656856728, 1658395987, 1658995707, 1659445339, 1660034367, 1660633945, 1661265097, 1661783641, 1661786628, 1661931859, 1661936023};
-std::vector<int> vtime = {0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29};
-std::vector<int> vrun_number = {0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29};
+std::vector<int> vtime = {0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59};
+std::vector<int> vrun_number = {0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59};
 
 void file_merger(std::vector<int> run_number, std::vector<int> time, string previous_file_s = "") {
 
 
-  TFile file(Form("root/split/Merged_Fit/Fit_Ref_%d-%d.root", run_number.at(0), run_number.at(run_number.size()-1)), "RECREATE");
+  TFile file(Form("root/split_time/Merged_Fit/Fit_Ref_%d-%d.root", run_number.at(0), run_number.at(run_number.size()-1)), "RECREATE");
 
 
 
   double Chi2, gain, gain_error_plus, gain_error_moins;
-  int om_number, int_run;
+  int om_number, int_run,ndf;
   double int_time;
 
   TTree Result_tree("Result_tree","");
@@ -382,6 +400,7 @@ void file_merger(std::vector<int> run_number, std::vector<int> time, string prev
   Result_tree.Branch("gain_error_moins", &gain_error_moins);
   Result_tree.Branch("run_number", &int_run);
   Result_tree.Branch("time", &int_time);
+  Result_tree.Branch("ndf", &ndf);
 
   // if (previous_file_s.compare("") != 0){
   //   TFile previous_file(Form("root/%s.root", previous_file_s.c_str()), "READ");
@@ -420,8 +439,8 @@ void file_merger(std::vector<int> run_number, std::vector<int> time, string prev
   // }
 
   for (int i = 0; i < run_number.size()-1; i++) {
-    TFile tree_file(Form("root/split/Best_Fit/Fit_Ref_%d_mini.root", run_number.at(i)), "READ");
-    std::cout << run_number.at(i) << '\n';
+    TFile tree_file(Form("root/split_time/Best_Fit/Fit_Ref_%d_mini.root", run_number.at(i)), "READ");
+    // std::cout << run_number.at(i) << '\n';
     TTree* tree = (TTree*)tree_file.Get("Result_tree");
     tree->SetBranchStatus("*",0);
     tree->SetBranchStatus("om_number",1);
@@ -434,6 +453,8 @@ void file_merger(std::vector<int> run_number, std::vector<int> time, string prev
     tree->SetBranchAddress("error_moins", &gain_error_moins);
     tree->SetBranchStatus("error_plus",1);
     tree->SetBranchAddress("error_plus", &gain_error_plus);
+    tree->SetBranchStatus("ndf",1);
+    tree->SetBranchAddress("ndf", &ndf);
 
     int_run = run_number.at(i);
     int_time = time.at(i+1);
@@ -450,9 +471,9 @@ void file_merger(std::vector<int> run_number, std::vector<int> time, string prev
 
 void TGrapher(std::string file_name, int n_run) {
   std::cout << "ok" << '\n';
-  TFile file(Form("root/split/TGraph/TGraph_%s.root", file_name.c_str()), "RECREATE");
+  TFile file(Form("root/split_time/TGraph/TGraph_%s.root", file_name.c_str()), "RECREATE");
 
-  TFile tree_file(Form("root/split/Merged_Fit/%s.root", file_name.c_str()), "READ");
+  TFile tree_file(Form("root/split_time/Merged_Fit/%s.root", file_name.c_str()), "READ");
   double int_time;
   int om_number, run_number;
   double gain;
@@ -478,6 +499,9 @@ void TGrapher(std::string file_name, int n_run) {
   double xaxis[n_run];
   double xaxis_error_moins[n_run];
   double xaxis_error_plus[n_run];
+  auto canvas = new TCanvas("Allfit","",1600,800);
+  canvas->Divide(3,2);
+  TGraphAsymmErrors *gain_graph[5]; //(n_run, xaxis, yaxis, xaxis_error_moins, xaxis_error_plus, yaxis_error_moins, yaxis_error_plus);
 
   file.cd();
   int compteur = 0;
@@ -486,7 +510,7 @@ void TGrapher(std::string file_name, int n_run) {
       tree->GetEntry(i+j*5);
       compteur++;
       // std::cout << "compteur " << i+j*5 << " and om = " << om_number << " and run = " << run_number << '\n';
-      std::cout << gain << '\n';
+      // std::cout << gain << '\n';
       yaxis[j] = gain;
       yaxis_error_moins[j] = gain_error_moins;
       yaxis_error_plus[j] = gain_error_plus;
@@ -494,28 +518,37 @@ void TGrapher(std::string file_name, int n_run) {
       xaxis_error_plus[j] = 0.00001;
       xaxis_error_moins[j] = 0.00001;
     }
-    for (size_t k = 0; k < n_run; k++) {
-      std::cout << yaxis[k] << '\n';
-    }
+    // for (size_t k = 0; k < n_run; k++) {
+    //   std::cout << yaxis[k] << '\n';
+    // }
+    gain_graph[i] = new TGraphAsymmErrors(n_run, xaxis, yaxis, xaxis_error_moins, xaxis_error_plus, yaxis_error_moins, yaxis_error_plus);
 
-    TGraphAsymmErrors gain_graph(n_run, xaxis, yaxis, xaxis_error_moins, xaxis_error_plus, yaxis_error_moins, yaxis_error_plus);
-    gain_graph.SetName(Form("fit_OM_ref_%d", om_number));
-    gain_graph.SetNameTitle(Form("fit_OM_ref_%d", om_number), Form("Gain evolution of the OM %d with background", om_number));
-    gain_graph.GetXaxis()->SetTimeDisplay(1);
-    gain_graph.GetXaxis()->SetTitle("Time");
-    gain_graph.GetYaxis()->SetTitle("Gain evolution");
-    gain_graph.SetMarkerColor(2);
-    gain_graph.SetMarkerStyle(5);
-    gain_graph.SetMarkerSize(2);
+    gain_graph[i]->SetName(Form("fit_OM_ref_%d", om_number));
+    gain_graph[i]->SetNameTitle(Form("fit_OM_ref_%d", om_number), Form("Gain evolution of the OM %d with regard to the background", om_number));
+    // gain_graph->GetXaxis()->SetTimeDisplay(1);
+    gain_graph[i]->GetXaxis()->SetTitle("Time");
+    gain_graph[i]->GetYaxis()->SetTitle("Gain evolution");
+    gain_graph[i]->GetYaxis()->SetRangeUser(0.98, 1.02);
+    gain_graph[i]->SetMarkerColor(2);
+    gain_graph[i]->SetMarkerStyle(5);
+    gain_graph[i]->SetMarkerSize(2);
+    canvas->cd(i+1);
+    gain_graph[i]->Draw("AP");
 
-
-    // TCanvas* canvas2 = new TCanvas;
-    // gain_graph.Draw();
-    // canvas2->SaveAs(Form("fit/fit_Tl/variation/charge_fit_om_%03d.png", j));
-    gain_graph.Write();
-
+    gain_graph[i]->Write();
+    canvas->Update();
+    // if (i == 4) {
+    //   canvas->Write();
+    // }
   }
+
+
+
+
+  canvas->Update();
+  canvas->Write();
   file.Close();
+
 }
 
 void comparator(int om){
@@ -606,125 +639,87 @@ void comparator(int om){
 }
 
 
-//
-// int main(int argc, char const *argv[]) {
-//   int n_run, run, t;
-//   std::vector<int> run_number, time, ref_run_number, ref_time;
-//   int compteur = 0;
-//   std::string file;
-//   bool add = false;
-//
-//   for(int i = 0; i<argc; i++){
-//     if (std::string(argv[i]) == "-add" ) {
-//       file = argv[i+1];
-//       std::cout << file << '\n';
-//       add = true;
-//     }
-//   }
-//
-//   if (add == true) {                  ///// Add run to the other runs
-//     string old_run;
-//     std::cout << "To what file do you want to add the new run(s)?" << '\n';
-//     std::cin >> old_run;
-//
-//     std::cout << "How many run do you want to add?" << '\n';
-//     std::cin >> n_run;
-//     std::cout << "Write the run(s) you want" << '\n';
-//     while (compteur < n_run && cin >> run) {
-//       run_number.push_back(run);
-//       std::cout << "Write the delay between the run(s) (run time beginning)" << '\n';
-//       while (compteur < n_run && cin >> t) {
-//         time.push_back(t);
-//         break;
-//       }
-//       compteur++;
-//       if (compteur < n_run) {
-//         std::cout << "Write the runs you want" << '\n';
-//       }
-//     }
-//     std::cout << "Code start running" << '\n';
-//
-//     for (int i = 0; i < n_run; i++) {
-//       Fit_Ref(run_number.at(i));
-//       minimum_calculator(Form("Fit_Ref_%d", run_number.at(i)));
-//     }
-//     std::cout << "Fit_Ref ok and minerror ok" << '\n';
-//
-//     file_merger(run_number, time, old_run);
-//     std::cout << "file_merger ok" << '\n';
-//
-//     TGrapher(Form("Fit_ref_716-%d.root", run_number.at(run_number.size())), n_run);
-//
-//   }
-//
-//
-//   else {                            ///// Create new file
-//     std::cout << "How many run do you want ?" << '\n';
-//     std::cin >> n_run;
-//     std::cout << "Write the runs you want" << '\n';
-//     while (compteur < n_run && cin >> run) {
-//       run_number.push_back(run);
-//       // std::cout << "Write the delay between the runs (0 for the first)" << '\n';
-//       // while (compteur < n_run && cin >> t) {
-//       //   time.push_back(t);
-//       //   break;
-//       // }
-//       compteur++;
-//       if (compteur < n_run) {
-//         std::cout << "Write the runs you want" << '\n';
-//       }
-//     }
-//     std::cout << "Code start running" << '\n';
-//
-//     for (int i = 0; i < n_run; i++) {
-//       Fit_Ref(run_number.at(i));
-//       minerror_calculator(Form("Fit_Ref_%d", run_number.at(i)));
-//     }
-//     std::cout << "Fit_Ref and minerror ok" << '\n';
-//
-//     file_merger(run_number, vtime);
-//     std::cout << "file_merger ok" << '\n';
-//
-//     TGrapher(Form("Fit_Ref_%d-%d", run_number.at(0), run_number.at(run_number.size()-1)), n_run+1);
-//   }
-//   std::cout << "Finish !!!" << '\n';
-//   return 0;
-// }
 
-int main(int argc, char const *argv[]) {                            //splitted file
+int main(int argc, char const *argv[]) {
   int n_run, run, t;
   std::vector<int> run_number, time, ref_run_number, ref_time;
   int compteur = 0;
   std::string file;
   bool add = false;
-  n_run = 60;
-  ///// Create new file
-  int i = 0;
-  while (i < n_run ) {
-    run_number.push_back(i);
-    time.push_back(i);
-    i++;
-  }
-  std::cout << "Code start running" << '\n';
 
-  for (int i = 59; i < n_run; i++) {
-    Fit_Ref(run_number.at(i));
-    std::cout << "Fit Ref " << i << " ok" << '\n';
-  }
-  return 0;
-  for (int i = 0; i < n_run; i++) {
-    minerror_calculator(Form("Fit_Ref_%d", run_number.at(i)));
-    std::cout << "minerror " << i << " ok" << '\n';
+  for(int i = 0; i<argc; i++){
+    if (std::string(argv[i]) == "-add" ) {
+      file = argv[i+1];
+      std::cout << file << '\n';
+      add = true;
+    }
   }
 
+  if (add == true) {                  ///// Add run to the other runs
+    string old_run;
+    std::cout << "To what file do you want to add the new run(s)?" << '\n';
+    std::cin >> old_run;
 
-  std::cout << "Fit_Ref and minerror ok" << '\n';
+    std::cout << "How many run do you want to add?" << '\n';
+    std::cin >> n_run;
+    std::cout << "Write the run(s) you want" << '\n';
+    while (compteur < n_run && cin >> run) {
+      run_number.push_back(run);
+      std::cout << "Write the delay between the run(s) (run time beginning)" << '\n';
+      while (compteur < n_run && cin >> t) {
+        time.push_back(t);
+        break;
+      }
+      compteur++;
+      if (compteur < n_run) {
+        std::cout << "Write the runs you want" << '\n';
+      }
+    }
+    std::cout << "Code start running" << '\n';
 
-  file_merger(run_number, vtime);
-  std::cout << "file_merger ok" << '\n';
+    for (int i = 0; i < n_run; i++) {
+      Fit_Ref(run_number.at(i));
+      minerror_calculator(Form("Fit_Ref_%d", run_number.at(i)), run_number.at(i));
+    }
+    std::cout << "Fit_Ref ok and minerror ok" << '\n';
 
-  TGrapher(Form("Fit_Ref_%d-%d", run_number.at(0), run_number.at(run_number.size()-1)), n_run+1);
+    file_merger(run_number, time, old_run);
+    std::cout << "file_merger ok" << '\n';
 
+    TGrapher(Form("Fit_ref_716-%d.root", run_number.at(run_number.size())), n_run);
+
+  }
+
+
+  else {                            ///// Create new file
+    std::cout << "How many run do you want ?" << '\n';
+    std::cin >> n_run;
+    std::cout << "Write the runs you want" << '\n';
+    while (compteur < n_run && cin >> run) {
+      run_number.push_back(run);
+      // std::cout << "Write the delay between the runs (0 for the first)" << '\n';
+      // while (compteur < n_run && cin >> t) {
+      //   time.push_back(t);
+      //   break;
+      // }
+      compteur++;
+      if (compteur < n_run) {
+        std::cout << "Write the runs you want" << '\n';
+      }
+    }
+    std::cout << "Code start running" << '\n';
+
+    for (int i = 0; i < n_run; i++) {
+      Fit_Ref(run_number.at(i));
+      minerror_calculator(Form("Fit_Ref_%d", run_number.at(i)), run_number.at(i));
+    }
+    std::cout << "Fit_Ref and minerror ok" << '\n';
+
+    file_merger(run_number, vtime);
+    std::cout << "file_merger ok" << '\n';
+
+    TGrapher(Form("Fit_Ref_%d-%d", run_number.at(0), run_number.at(run_number.size()-1)), n_run+1);
+  }
   std::cout << "Finish !!!" << '\n';
   return 0;
 }
