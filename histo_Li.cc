@@ -436,6 +436,28 @@ int intensity_chooser(int pic){
   return intensity;
 }
 
+int time_measurer(string file_number){
+  TFile tree_file(Form("histo_brut/Li_system_%d.root", run_number), "READ");
+  int om_number;
+  double charge_tree;
+  double amplitude_tree;
+  TTree* tree = (TTree*)tree_file.Get("Result_tree");
+  gROOT->cd();
+  tree->SetBranchStatus("*",0);
+  tree->SetBranchStatus("om_number",1);
+  tree->SetBranchAddress("om_number", &om_number);
+  tree->SetBranchStatus("time",1);
+  tree->SetBranchAddress("time", &time);
+
+  TH1D *spectre = new TH1D ("time", "", 1000, 0, 250);
+  tree->Project("spectre_amplitude", "amplitude_tree", );
+
+
+
+}
+
+
+
 void fit_LI_amplitude(int run_number, int time2 = 0){
   gStyle->SetOptFit(1);
   gStyle->SetOptStat(0);
@@ -485,9 +507,14 @@ void fit_LI_amplitude(int run_number, int time2 = 0){
   tree->SetBranchStatus("amplitude_tree",1);
   tree->SetBranchAddress("amplitude_tree", &amplitude_tree);
   int n_evt = 0;
+  int number = 800;
+  if (run_number > 836) {
+    number = 712;
+  }
+
   while (n_evt < 100) {
     TH1D *spectre = new TH1D ("spectre_amplitude", "", 700, 0, 2300);
-    tree->Project("spectre_amplitude", "amplitude_tree", Form("om_number == 800 && time < %f  && amplitude_tree > 10", debut));
+    tree->Project("spectre_amplitude", "amplitude_tree", Form("om_number == %d && time < %f  && amplitude_tree > 10", number, debut));
     debut++;
 
     n_evt = spectre->GetEntries();
@@ -498,15 +525,15 @@ void fit_LI_amplitude(int run_number, int time2 = 0){
   std::cout << "debut = " << debut << '\n';
 
 
-  for(int om = 800; om < 805; om+=1)
+  for(int om = number; om < number + 5; om+=1)
   {
     if (om ==712) {
-      om = 800;
+      om = number;
     }
     for (double j = debut; j < debut+6*40.5; j = j+40.5)
     {
       double temps = j;
-      if ((om > 259 && om < 520) || (om > 583 && om < 647) || (om > 679 && om < 712) ) {temps=(265+j-debut);}
+      if ((om > 259 && om < 520) || (om > 583 && om < 647) .|| (om > 679 && om < 712) ) {temps=(265+j-debut);}
       TH1D *spectre = new TH1D ("spectre_amplitude", "", 700, 0, 2300 );
       tree->Project("spectre_amplitude", "amplitude_tree", Form("om_number == %d && time > %f && time < %f && amplitude_tree > 10", om, temps, ceil(temps+32.5)));
       std::cout << "temps = " << temps << " - " << ceil(temps+32.5) << '\n';
@@ -1131,7 +1158,7 @@ int main(int argc, char const *argv[]){
 
   return 0;
 }
-//
+
 // void Ref_variation_tgraph(std::vector<int> run_number, std::vector<int> time) {
 //
 //   int om_number;

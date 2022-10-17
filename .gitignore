@@ -11,3 +11,8 @@ histo_brut/
 *calcul_gain_ref/histo_brut
 *calcul_gain_ref/fit
 *calcul_gain_ref/test
+*calcul_gain_ref_split/root
+*calcul_gain_ref_split/histo_brut
+*calcul_gain_ref_split/fit
+*calcul_gain_ref_split/test
+*documents
