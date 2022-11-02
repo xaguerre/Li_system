@@ -490,6 +490,10 @@ std::vector<double> time_measurer(int run_number){
   return interval;
 }
 
+void Ref_corrector(int run_number, int om) {
+
+}
+
 void fit_LI_amplitude(int run_number){
   gStyle->SetOptFit(1);
   gStyle->SetOptStat(1);
@@ -901,8 +905,8 @@ void test() {
   TGrapher("fit_total", 16);
 }
 
-void pic_comparator() {
-  int om_number, pic;
+void pic_comparator(int n_run) {
+  int om_number, pic, run_number;
   double Amplitude, Amplitude_error, time;
   TFile file("root/evolution_pic.root", "RECREATE");
 
@@ -919,39 +923,96 @@ void pic_comparator() {
   tree->SetBranchAddress("Amplitude_error", &Amplitude_error);
   tree->SetBranchStatus("time",1);
   tree->SetBranchAddress("time", &time);
+  tree->SetBranchStatus("run_number",1);
+  tree->SetBranchAddress("run_number", &run_number);
   gROOT->cd();
-  TH2D *variation_pic[5][6];
-  file.cd();
+
+  double yaxis[n_run];
+  double yaxis_error[n_run];
+  double xaxis_error[n_run];
+  double xaxis[n_run];
+  TGraphErrors *variation_pic[5][6];
+
+
   string name;
   double ref[5];
+  double ref_err[5];
+  int compteur = 0;
   for (int om = 712; om < 717; om++) {
     name = namer(om);
-    variation_pic[om-712][2] = new TH2D(Form("Gain_evolution_of_the_OM_%s_pic_3", name.c_str()), Form("Gain_evolution_of_the_OM_%s_pic_3", name.c_str()), 1000, 1.662e9, 1.665e9, 1000, 0, 2300);
+
+
     for (int i = 0; i < tree->GetEntries(); i++) {
       tree->GetEntry(i);
       if (pic == 3 && om_number == om) {
-        ref[om-712] = Amplitude;
-        variation_pic[om-712][2]->Fill(time, Amplitude);
+        if (run_number == 788) {
+          ref[om-712] = Amplitude;
+          ref_err[om-712] = Amplitude_error;
+        }
+        yaxis[compteur] = Amplitude;
+        yaxis_error[compteur] = Amplitude_error;
+        xaxis[compteur] = time;
+        xaxis_error[compteur] = 0.01;
+        compteur++;
+        // std::cout << "om = " << om <<  " entry = " << compteur -1 << " and ampl = " << Amplitude << " +- " << Amplitude_error << " and time = " << time << '\n';
       }
     }
+    variation_pic[om-712][2] = new TGraphErrors(n_run, xaxis, yaxis, xaxis_error, yaxis_error);
+    variation_pic[om-712][2]->SetName(Form("Gain_evolution_of_the_OM_%s_of_pic_3", name.c_str()));
+    variation_pic[om-712][2]->SetNameTitle(Form("Gain_evolution_of_the_OM_%s_of_pic_3", name.c_str()), Form("Gain_evolution_of_the_OM_%s_of_pic_3", name.c_str()));
+    variation_pic[om-712][2]->GetXaxis()->SetTitle("Temps (h)");
+    variation_pic[om-712][2]->GetYaxis()->SetTitle("Amplitude (ua)");
+    // variation_pic[om-712][2]->GetYaxis()->SetRange(0,2000);
+    // variation_pic[om-712][2]->GetXaxis()->SetRange(0,2);
+    variation_pic[om-712][2]->GetXaxis()->SetTimeDisplay(1);
+    variation_pic[om-712][2]->SetMarkerColor(2);
+    variation_pic[om-712][2]->SetMarkerStyle(3);
+    variation_pic[om-712][2]->SetMarkerSize(2);
+    // variation_pic[om-712][2]->Draw();
+    compteur = 0;
   }
+
   for (int om = 712; om < 717; om++) {
     for (int pique = 0; pique < 6; pique++) {
       if (pique == 2){pique = 3;}
       name = namer(om);
-      variation_pic[om-712][pique] = new TH2D(Form("Gain_evolution_of_the_OM_%s_of_pic_%d_in_regard_to_pic_3", name.c_str(), pique+1), Form("Gain_evolution_of_the_OM_%s_of_pic_%d_in_regard_to_pic_3", name.c_str(), pique+1), 1000, 1.662e9, 1.665e9, 1000, 0, 2);
+
       for (int i = 0; i < tree->GetEntries(); i++) {
         tree->GetEntry(i);
-        std::cout << "i = " << i << " amplitude = " << Amplitude << '\n';
+        // std::cout << "pic = " << pic << " om = " << om << " i = " << i << " amplitude = " << Amplitude << '\n';
         if (pic !=3 && om_number == om && pic == pique) {
-          variation_pic[om-712][pique]->Fill( time,Amplitude/ref[om-712]);
-          std::cout << "time = " << time << " and amplitude = " << Amplitude/ref[om-712] << '\n';
+          if (Amplitude == 0) {
+            break;
+          }
+          yaxis[compteur] = abs(Amplitude - ref[om-712])/ref[om-712];
+          yaxis_error[compteur] = (Amplitude_error/ref[om - 712] + (ref_err[om-712]*Amplitude)/(ref[om - 712]*ref[om - 712]));
+          std::cout << "om = " << om << " and pique = " << pique <<  " and pic = " << pic << " and run = " << run_number << '\n';
+          std::cout << " and amplitude = " << abs(Amplitude - ref[om-712])/ref[om-712] << " +- " << Amplitude_error/ref[om - 712] + (ref_err[om-712]*Amplitude)/(ref[om - 712]*ref[om - 712])<< '\n';
+          std::cout << "ampl = " << Amplitude << " and ref = " << ref[om-712] << '\n';
+          xaxis[compteur] = time;
+
+          xaxis_error[compteur] = 0.01;
+
+          compteur++;
+
         }
-        variation_pic[om-712][pique]->Draw();
-        // return;
+        variation_pic[om-712][pique] = new TGraphErrors(n_run, xaxis, yaxis, xaxis_error, yaxis_error);
+        variation_pic[om-712][pique]->SetName(Form("Gain_evolution_of_the_OM_%s_of_pic_%d_in_regard_to_pic_3", name.c_str(), pique+1));
+        variation_pic[om-712][pique]->SetNameTitle(Form("Gain_evolution_of_the_OM_%s_of_pic_%d_in_regard_to_pic_3", name.c_str(), pique+1), Form("Gain_evolution_of_the_OM_%s_of_pic_%d_in_regard_to_pic_3", name.c_str(), pique+1));
+        variation_pic[om-712][pique]->GetXaxis()->SetTitle("Temps (h)");
+        variation_pic[om-712][pique]->GetYaxis()->SetTitle("Amplitude/Amplitude pic 3");
+        variation_pic[om-712][pique]->GetXaxis()->SetTimeDisplay(1);
+        variation_pic[om-712][pique]->SetMarkerColor(2);
+        variation_pic[om-712][pique]->SetMarkerStyle(3);
+        variation_pic[om-712][pique]->SetMarkerSize(2);
+        variation_pic[om-712][2]->GetXaxis()->SetRangeUser(0,2);
+        // variation_pic[om-712][pique]->GetYaxis()->SetRangeUser(0.5, 1.5);
+
       }
+        compteur = 0;
     }
   }
+  file.cd();
   for (int om = 712; om < 717; om++) {
     auto canvas = new TCanvas(Form("Comparison_pic_evolution_om_%d", om),"",1600,800);
     canvas->Divide(3,2);
@@ -973,6 +1034,7 @@ void pic_comparator() {
       }
     }
     canvas->Update();
+    // return;
     canvas->Write();
     delete canvas;
   }
@@ -986,7 +1048,7 @@ int main(int argc, char const *argv[]){
   int n_run, run, t;
   std::vector<int> run_number, ref_run_number, ref_time;
   int compteur = 0;
-  string file;
+  string file, correction;
   bool add = false;
 
   for(int i = 0; i<argc; i++){
@@ -1006,13 +1068,19 @@ int main(int argc, char const *argv[]){
       std::cout << "Write the runs you want" << '\n';
     }
   }
+
+  std::cout << "Correction file name ?" << '\n';
+  std::cin >> correction;
+
+
+
   compteur = 0;
   n_run = 0;
 
   std::cout << "Code start running" << '\n';
 
   for (int i = 0; i < run_number.size(); i++) {
-    fit_LI_amplitude(run_number[i]);
+    fit_LI_amplitude(run_number[i], );
   }
   // for (int i = 0; i < ref_run_number.size(); i++) {
   //   fit_ref(ref_run_number[i], ref_time[i]);
