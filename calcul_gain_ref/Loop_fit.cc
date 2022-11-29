@@ -302,7 +302,7 @@ void Fit_Ref(int run_number) {
 
 }
 
-void minerror_calculator(string file_name, int run_number, int kount) {
+void minerror_calculator(string file_name, int run_number) {
   TFile file(Form("root/Complete_Fit/%s.root", file_name.c_str()), "READ");
   gROOT->cd();
   double PolChi2, Chi2, gain, gainmin, chi2min, error_plus, error_moins, minChi2, mingain_tree, time, ndf;
@@ -336,7 +336,6 @@ void minerror_calculator(string file_name, int run_number, int kount) {
   tree->SetBranchAddress("time", &time);
 
 
-  std::vector<int> vtime = {1655219940, 1656339281, 1656427367, 1656513370, 1656596183, 1656689629, 1656772061, 1656856728, 1658395987, 1658995707, 1659445339, 1660034367, 1660633945, 1661265097, 1661783641, 1661786628, 1661931859, 1661936023};
   TFile newfile(Form("root/Best_Fit/%s_mini.root", file_name.c_str()), "RECREATE");
   gROOT->cd();
 
@@ -354,7 +353,6 @@ void minerror_calculator(string file_name, int run_number, int kount) {
     }
 
     // ndf = ndf_counter(i, run_number)-1;
-
     mingain_tree = gainmin;
     TF1* poly = new TF1 ("poly", "pol2", gainmin - 0.01, gainmin + 0.01);
     std::cout << "gainmin = " << gainmin << '\n';
@@ -379,10 +377,6 @@ void minerror_calculator(string file_name, int run_number, int kount) {
     std::cout << "min = " << poly->GetMinimum() << " ; " << poly->GetMinimumX() << " + " << error_plus << " - " << error_moins << '\n';
     std::cout << "Chi2 = " << PolChi2 << '\n';
     can->SaveAs(Form("fit/om_%d/run_%d/fit_Chi2_gain.png", i, run_number));
-
-    if (kount < 18) {
-      time = vtime.at(kount);
-    }
 
     Result_tree.Fill();
     delete Chi2gain;
@@ -693,12 +687,12 @@ int main(int argc, char const *argv[]) {
     std::cout << "Code start running" << '\n';
 
     for (int i = 0; i < n_run; i++) {
-      Fit_Ref(run_number.at(i));
+      // Fit_Ref(run_number.at(i));
       // minerror_calculator(Form("Fit_Ref_%d", run_number.at(i)), run_number.at(i));
     }
     std::cout << "Fit_Ref ok and minerror ok" << '\n';
 
-    file_merger(run_number, old_run);
+    // file_merger(run_number, old_run);
     std::cout << "file_merger ok" << '\n';
 
     TGrapher(Form("Fit_ref_716-%d.root", run_number.at(run_number.size()-1)), n_run);
@@ -718,11 +712,9 @@ int main(int argc, char const *argv[]) {
       }
     }
     std::cout << "Code start running" << '\n';
-    int kount = 1;
     for (int i = 0; i < n_run; i++) {
-      // Fit_Ref(run_number.at(i));
-      minerror_calculator(Form("Fit_Ref_%d", run_number.at(i)), run_number.at(i), kount);
-      kount++;
+      Fit_Ref(run_number.at(i));
+      minerror_calculator(Form("Fit_Ref_%d", run_number.at(i)), run_number.at(i));
     }
     std::cout << "Fit_Ref and minerror ok" << '\n';
 

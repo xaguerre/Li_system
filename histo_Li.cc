@@ -72,40 +72,6 @@ string namer(int om){
   return name;
 }
 
-void txt_to_root() {
-
-  std::ifstream parametres("/home/aguerre/Bureau/Thèse/Li_system/Resultats_txt/Resultats_charge.txt");
-  TFile file("test.root","RECREATE");
-
-  int compteur = 0;
-  int om_number;
-  double n_evt;
-  double mean_charge;
-  double sigma;
-  double nbg;
-  double C = 0;
-
-  TTree Result_tree("Result_tree","");
-  Result_tree.Branch("om_number", &om_number);
-  Result_tree.Branch("n_evt", &n_evt);
-  Result_tree.Branch("mean_charge", &mean_charge);
-  Result_tree.Branch("sigma", &sigma);
-  Result_tree.Branch("nbg", &nbg);
-  Result_tree.Branch("C", &C);
-
-  while(parametres >> om_number)
-  {
-    parametres >> n_evt >> mean_charge >> sigma >> nbg >> C;
-    Result_tree.Fill();
-    compteur++;
-  }
-
-  file.cd();
-  Result_tree.Write();
-  file.Close();
-
-}
-
 void Get_Mean() {
 
   TFile file("root/getMean.root","RECREATE");
@@ -230,6 +196,7 @@ std::vector<double> time_measurer(int run_number){
       moins = 0;
     }
   }
+
   std::vector<double> interval;
   interval.push_back(time_measurer.at(0));
   for (int j = 1; j < time_measurer.size()-2; j+=2) {
@@ -266,362 +233,40 @@ double* Ref_corrector(int run, string correction, double *gain_tab) {
   return gain_tab;
 }
 
-void fit_LI_amplitude(int run_number, double *ref_gain_table){
-  gStyle->SetOptFit(1);
-  gStyle->SetOptStat(1);
-  TH1::SetDefaultSumw2();
-  TH2::SetDefaultSumw2();
-
-  TFile file(Form("root/Fit_Ampl/Amplitude_Li_run_%d.root", run_number),"RECREATE");
-
-  std::vector<double> interval;
-  interval = time_measurer(run_number);
-
-  int om_number;
-  double constante;
-  double mean, time, start_time;
-  double mean_error, nevent;
-  double sigma;
-  int pic =0;
-  double Khi2 = 0;
-  int intensity = 0;
-
-  TTree Result_tree("Result_tree","");
-  Result_tree.Branch("om_number", &om_number);
-  Result_tree.Branch("pic", &pic);
-  Result_tree.Branch("Khi2", &Khi2);
-  Result_tree.Branch("constante", &constante);
-  Result_tree.Branch("Amplitude", &mean);
-  Result_tree.Branch("Amplitude_error", &mean_error);
-  Result_tree.Branch("sigma", &sigma);
-  Result_tree.Branch("run_number", &run_number);
-  Result_tree.Branch("intensity", &intensity);
-  Result_tree.Branch("time", &start_time);
-  Result_tree.Branch("nevent", &nevent);
-
-
-  int debut = 0;
-  TCanvas* canvas = new TCanvas;
-  TH1F comp_map("comp_map", "comp_map", 100, 0, 100);
-  TFile *tree_file = new TFile (Form("histo_brut/Li_system_%d.root", run_number), "READ");
-
-  double charge_tree;
-  double amplitude_tree;
-  TTree* tree = (TTree*)tree_file->Get("Result_tree");
-  gROOT->cd();
-  tree->SetBranchStatus("*",0);
-  tree->SetBranchStatus("om_number",1);
-  tree->SetBranchAddress("om_number", &om_number);
-  tree->SetBranchStatus("time",1);
-  tree->SetBranchAddress("time", &time);
-  tree->SetBranchStatus("charge_tree",1);
-  tree->SetBranchAddress("charge_tree", &charge_tree);
-  tree->SetBranchStatus("amplitude_tree",1);
-  tree->SetBranchAddress("amplitude_tree", &amplitude_tree);
-
-  TParameter<double> *param = new TParameter<double>("start_time", time);
-  param = (TParameter<double>*)(tree_file->Get("start_time"));
-  start_time = param->GetVal();
-  std::cout << "time = " << start_time << '\n';
-  gROOT->cd();
-
-  int number = 800;
-  if (run_number > 836) {
-    number = 712;
+int Ref_bundle_number(int om_number, string wall){
+  int bundle_number = 0;
+  if (om_number == 712 && wall.compare("IT") == 0) {
+    bundle_number = 1;
   }
-
-  for(int om = number; om < number + 5; om+=1)
-  {
-    if (om == 712) {
-      om = number;
-    }
-    if ((om > 259 && om < 520) || (om > 583 && om < 647) || (om > 679 && om < 712) ) {debut = debut + (interval.size()/2);}
-    for (double j = debut; j < debut + (interval.size()/2); j++)
-    {
-
-      TH1D *spectre = new TH1D ("spectre_amplitude", "", 700, 0, 2300 );
-      tree->Project("spectre_amplitude", Form("amplitude_tree*%f", ref_gain_table[om - number]), Form("om_number == %d && time > %f && time < %f && amplitude_tree > 10", om, interval.at(j), interval.at(j+1)));
-
-      if (om >711) {
-        tree->Project("spectre_amplitude", Form("amplitude_tree*%f", ref_gain_table[om - number]), Form("om_number == %d && time > %f && time < %f && amplitude_tree > 10", om, interval.at(j), interval.at(j+1)));
-        std::cout << "ref_gain = " << ref_gain_table[om-712] << '\n';
-      }
-      else tree->Project("spectre_amplitude", "amplitude_tree", Form("om_number == %d && time > %f && time < %f && amplitude_tree > 10", om, interval.at(j), interval.at(j+1)));
-
-      std::cout << "temps = " << interval.at(j) << " - " << interval.at(j+1) << '\n';
-      if (spectre->GetEntries() < 300) {
-        std::cout << "" << '\n';
-        std::cout << "trop peu d'entries pour l'OM " << om << '\n';
-        std::cout << "" << '\n';
-        pic = j;
-        Khi2 = 0;
-        om_number = om;
-        mean = 0;
-        mean_error = 0;
-        if (om > 711 && run_number < 837) {
-          om_number = om-88;
-        }
-        Result_tree.Fill();
-        delete spectre;
-      }
-      else if (spectre->GetMean() > 1900) {
-        std::cout << "" << '\n';
-        std::cout << "the amplitude sature" << '\n';
-        std::cout << "" << '\n';
-        pic = j;
-        Khi2 = 0;
-        om_number = om;
-        mean = 0;
-        mean_error = 0;
-        if (om > 711 && run_number < 837) {
-          om_number = om-88;
-        }
-        Result_tree.Fill();
-        delete spectre;
-      }
-      else if (spectre->GetMean() < 20){
-        std::cout << "" << '\n';
-        std::cout << "too few charge" << '\n';
-        std::cout << "" << '\n';
-        pic = j;
-        Khi2 = 0;
-        om_number = om;
-        mean = 0;
-        mean_error = 0;
-        if (om > 711 && run_number < 837) {
-          om_number = om-88;
-        }
-        Result_tree.Fill();
-        delete spectre;
-      }
-      else{
-        nevent = spectre->Integral();
-        TF1 *f_Gaus = new TF1("f_Gaus", "gaus(0)", 0, 1200);
-        f_Gaus->SetParNames("N_evt","mean_charge","Sigma");
-        // f_Gaus->SetParameters(25, spectre->GetMean(), 100);
-        f_Gaus->SetParameters(25, spectre->GetMean(), spectre->GetRMS());
-        f_Gaus->SetRange(spectre->GetMean()-400, spectre->GetMean()+400);
-        f_Gaus->Draw("same");
-        spectre->Fit(f_Gaus, "RQ0");
-        f_Gaus->SetRange(f_Gaus->GetParameter(1)-2.5*f_Gaus->GetParameter(2),f_Gaus->GetParameter(1)+5*f_Gaus->GetParameter(2));
-        spectre->Fit(f_Gaus, "RQ0");
-        f_Gaus->SetRange(f_Gaus->GetParameter(1)-2.5*f_Gaus->GetParameter(2),f_Gaus->GetParameter(1)+5*f_Gaus->GetParameter(2));
-        spectre->Fit(f_Gaus, "RQ0");
-
-        pic = j;
-        Khi2 = f_Gaus->GetChisquare()/f_Gaus->GetNDF();
-        om_number = om;
-        constante = (f_Gaus->GetParameter(0));
-        mean = (f_Gaus->GetParameter(1));
-        sigma = (f_Gaus->GetParameter(2));
-        mean_error = f_Gaus->GetParError(1) ;
-        intensity = intensity_chooser(pic);
-        spectre->Draw();
-        f_Gaus->Draw("same");
-
-        if (om < 712) {
-          canvas->SaveAs(Form("fit/fit_Li/amplitude_fit/om_%d/OM_%03d_pic_%d_run_%d.png", om, pic, om_number, run_number));
-        }
-        if (om > 711 && run_number < 837) {
-          canvas->SaveAs(Form("fit/fit_Li/amplitude_fit_ref/om_%d/OM_%03d_pic_%d_run_%d.png", om-88, om -88, pic, run_number));
-          om_number = om-88;
-        }
-        if (om > 711 && run_number > 836) {
-          canvas->SaveAs(Form("fit/fit_Li/amplitude_fit_ref/om_%d/OM_%03d_pic_%d_run_%d.png", om, om, pic, run_number));
-        }
-        Result_tree.Fill();
-
-        delete spectre;
-        delete f_Gaus;
-      }
-    }
+  if (om_number == 713 && wall.compare("IT") == 0) {
+    bundle_number = 3;
   }
-  std::cout << "time = " << start_time << '\n';
-
-  file.cd();
-  Result_tree.Write();
-  file.Close();
-  return;
+  if (om_number == 714 && wall.compare("IT") == 0) {
+    bundle_number = 4;
+  }
+  if (om_number == 715 && wall.compare("IT") == 0) {
+    bundle_number = 2;
+  }
+  if (om_number == 716 && wall.compare("IT") == 0) {
+    bundle_number = 5;
+  }
+  if (om_number == 712 && wall.compare("FR") == 0) {
+    bundle_number = 6;
+  }
+  if (om_number == 713 && wall.compare("FR") == 0) {
+    bundle_number = 7;
+  }
+  if (om_number == 714 && wall.compare("FR") == 0) {
+    bundle_number = 9;
+  }
+  if (om_number == 715 && wall.compare("FR") == 0) {
+    bundle_number = 8;
+  }
+  if (om_number == 716 && wall.compare("FR") == 0) {
+    bundle_number = 10;
+  }
+  return bundle_number;
 }
-
-void fit_LI_amplitude_Ref(int run_number, double *ref_gain_table){
-  gStyle->SetOptFit(1);
-  gStyle->SetOptStat(1);
-  TH1::SetDefaultSumw2();
-  TH2::SetDefaultSumw2();
-
-  TFile file(Form("root/Fit_Ampl/Amplitude_Li_run_%d.root", run_number),"RECREATE");
-
-  std::vector<double> interval;
-  interval = time_measurer(run_number);
-
-  int om_number;
-  double constante;
-  double mean, time, start_time;
-  double mean_error, nevent;
-  double sigma;
-  int pic =0;
-  double Khi2 = 0;
-  int intensity = 0;
-
-  TTree Result_tree("Result_tree","");
-  Result_tree.Branch("om_number", &om_number);
-  Result_tree.Branch("pic", &pic);
-  Result_tree.Branch("Khi2", &Khi2);
-  Result_tree.Branch("constante", &constante);
-  Result_tree.Branch("Amplitude", &mean);
-  Result_tree.Branch("Amplitude_error", &mean_error);
-  Result_tree.Branch("sigma", &sigma);
-  Result_tree.Branch("run_number", &run_number);
-  Result_tree.Branch("intensity", &intensity);
-  Result_tree.Branch("time", &start_time);
-  Result_tree.Branch("nevent", &nevent);
-
-
-  int debut = 0;
-  TCanvas* canvas = new TCanvas;
-  TH1F comp_map("comp_map", "comp_map", 100, 0, 100);
-  TFile *tree_file = new TFile (Form("histo_brut/Li_system_%d.root", run_number), "READ");
-
-  double charge_tree;
-  double amplitude_tree;
-  TTree* tree = (TTree*)tree_file->Get("Result_tree");
-  gROOT->cd();
-  tree->SetBranchStatus("*",0);
-  tree->SetBranchStatus("om_number",1);
-  tree->SetBranchAddress("om_number", &om_number);
-  tree->SetBranchStatus("time",1);
-  tree->SetBranchAddress("time", &time);
-  tree->SetBranchStatus("charge_tree",1);
-  tree->SetBranchAddress("charge_tree", &charge_tree);
-  tree->SetBranchStatus("amplitude_tree",1);
-  tree->SetBranchAddress("amplitude_tree", &amplitude_tree);
-
-  TParameter<double> *param = new TParameter<double>("start_time", time);
-  param = (TParameter<double>*)(tree_file->Get("start_time"));
-  start_time = param->GetVal();
-  std::cout << "time = " << start_time << '\n';
-  gROOT->cd();
-
-  int number = 800;
-  if (run_number > 836) {
-    number = 712;
-  }
-
-  for(int om = number; om < number + 5; om+=1)
-  {
-    if (om == 712) {
-      om = number;
-    }
-    if ((om > 259 && om < 520) || (om > 583 && om < 647) || (om > 679 && om < 712) ) {debut = debut + (interval.size()/2);}
-    for (double j = debut; j < debut + (interval.size()/2); j++)
-    {
-
-      TH1D *spectre = new TH1D ("spectre_amplitude", "", 700, 0, 2300 );
-      tree->Project("spectre_amplitude", Form("amplitude_tree*%f", ref_gain_table[om - number]), Form("om_number == %d && time > %f && time < %f && amplitude_tree > 10", om, interval.at(j), interval.at(j+1)));
-
-      if (om >711) {
-        tree->Project("spectre_amplitude", Form("amplitude_tree*%f", ref_gain_table[om - number]), Form("om_number == %d && time > %f && time < %f && amplitude_tree > 10", om, interval.at(j), interval.at(j+1)));
-        std::cout << "ref_gain = " << ref_gain_table[om-712] << '\n';
-      }
-      else tree->Project("spectre_amplitude", "amplitude_tree", Form("om_number == %d && time > %f && time < %f && amplitude_tree > 10", om, interval.at(j), interval.at(j+1)));
-
-      std::cout << "temps = " << interval.at(j) << " - " << interval.at(j+1) << '\n';
-      if (spectre->GetEntries() < 300) {
-        std::cout << "" << '\n';
-        std::cout << "trop peu d'entries pour l'OM " << om << '\n';
-        std::cout << "" << '\n';
-        pic = j;
-        Khi2 = 0;
-        om_number = om;
-        mean = 0;
-        mean_error = 0;
-        if (om > 711 && run_number < 837) {
-          om_number = om-88;
-        }
-        Result_tree.Fill();
-        delete spectre;
-      }
-      else if (spectre->GetMean() > 1900) {
-        std::cout << "" << '\n';
-        std::cout << "the amplitude sature" << '\n';
-        std::cout << "" << '\n';
-        pic = j;
-        Khi2 = 0;
-        om_number = om;
-        mean = 0;
-        mean_error = 0;
-        if (om > 711 && run_number < 837) {
-          om_number = om-88;
-        }
-        Result_tree.Fill();
-        delete spectre;
-      }
-      else if (spectre->GetMean() < 20){
-        std::cout << "" << '\n';
-        std::cout << "too few charge" << '\n';
-        std::cout << "" << '\n';
-        pic = j;
-        Khi2 = 0;
-        om_number = om;
-        mean = 0;
-        mean_error = 0;
-        if (om > 711 && run_number < 837) {
-          om_number = om-88;
-        }
-        Result_tree.Fill();
-        delete spectre;
-      }
-      else{
-        nevent = spectre->Integral();
-        TF1 *f_Gaus = new TF1("f_Gaus", "gaus(0)", 0, 1200);
-        f_Gaus->SetParNames("N_evt","mean_charge","Sigma");
-        // f_Gaus->SetParameters(25, spectre->GetMean(), 100);
-        f_Gaus->SetParameters(25, spectre->GetMean(), spectre->GetRMS());
-        f_Gaus->SetRange(spectre->GetMean()-400, spectre->GetMean()+400);
-        f_Gaus->Draw("same");
-        spectre->Fit(f_Gaus, "RQ0");
-        f_Gaus->SetRange(f_Gaus->GetParameter(1)-2.5*f_Gaus->GetParameter(2),f_Gaus->GetParameter(1)+5*f_Gaus->GetParameter(2));
-        spectre->Fit(f_Gaus, "RQ0");
-        f_Gaus->SetRange(f_Gaus->GetParameter(1)-2.5*f_Gaus->GetParameter(2),f_Gaus->GetParameter(1)+5*f_Gaus->GetParameter(2));
-        spectre->Fit(f_Gaus, "RQ0");
-
-        pic = j;
-        Khi2 = f_Gaus->GetChisquare()/f_Gaus->GetNDF();
-        om_number = om;
-        constante = (f_Gaus->GetParameter(0));
-        mean = (f_Gaus->GetParameter(1));
-        sigma = (f_Gaus->GetParameter(2));
-        mean_error = f_Gaus->GetParError(1) ;
-        intensity = intensity_chooser(pic);
-        spectre->Draw();
-        f_Gaus->Draw("same");
-
-        if (om < 712) {
-          canvas->SaveAs(Form("fit/fit_Li/amplitude_fit/om_%d/OM_%03d_pic_%d_run_%d.png", om, pic, om_number, run_number));
-        }
-        if (om > 711 && run_number < 837) {
-          canvas->SaveAs(Form("fit/fit_Li/amplitude_fit_ref/om_%d/OM_%03d_pic_%d_run_%d.png", om-88, om -88, pic, run_number));
-          om_number = om-88;
-        }
-        if (om > 711 && run_number > 836) {
-          canvas->SaveAs(Form("fit/fit_Li/amplitude_fit_ref/om_%d/OM_%03d_pic_%d_run_%d.png", om, om, pic, run_number));
-        }
-        Result_tree.Fill();
-
-        delete spectre;
-        delete f_Gaus;
-      }
-    }
-  }
-  std::cout << "time = " << start_time << '\n';
-
-  file.cd();
-  Result_tree.Write();
-  file.Close();
-  return;
-}
-
 
 int bundle_number(int om_number){
   int bundle_number = 0;
@@ -658,9 +303,393 @@ int bundle_number(int om_number){
   return bundle_number;
 }
 
-void file_merger(std::vector<int> run, string addfile = "") {
+double* Li_corrector(int run, string correction, double *gain_tab, int run_ref) {
+
+  // TFile file(Form("root/Merged_Ref/Fit_Ref_%s.root", correction.c_str()), "READ");
+  TFile file(Form("root/Merged_Ref/%s.root", correction.c_str()), "READ");
+
+  if (run == run_ref) {
+    for (int i = 0; i < 712; i++) {
+      gain_tab[i] = 1;
+    }
+  }
+  else{
+    int run_number, pic, om_number;
+    double Amplitude;
+    double ref_gain_tab[10];
+    string wall;
+    TTree* tree = (TTree*)file.Get("Result_tree");
+    tree->SetBranchStatus("*",0);
+    tree->SetBranchStatus("Amplitude",1);
+    tree->SetBranchAddress("Amplitude", &Amplitude);
+    tree->SetBranchStatus("run_number",1);
+    tree->SetBranchAddress("run_number", &run_number);
+    tree->SetBranchStatus("pic",1);
+    tree->SetBranchAddress("pic", &pic);
+    tree->SetBranchStatus("om_number",1);
+    tree->SetBranchAddress("om_number", &om_number);
+    tree->SetBranchStatus("wall",1);
+    tree->SetBranchAddress("wall", &wall);
+
+    for (int i = 0; i < tree->GetEntries(); i++) {
+      tree->GetEntry(i);
+      if (run_number == run_ref && pic == 3){
+        ref_gain_tab[Ref_bundle_number(om_number, wall)] = Amplitude;
+      }
+    }
+    for (int i = 0; i < tree->GetEntries(); i++) {
+      tree->GetEntry(i);
+      if (run_number == run && pic == 3) {
+        gain_tab[Ref_bundle_number(om_number, wall)] = Amplitude/ref_gain_tab[Ref_bundle_number(om_number, wall)];
+      }
+    }
+  }
+  file.Close();
+  return gain_tab;
+}
+
+void fit_LI_amplitude(int run_number, double *correction_gain_table){
+  gStyle->SetOptFit(1);
+  gStyle->SetOptStat(1);
+  TH1::SetDefaultSumw2();
+  TH2::SetDefaultSumw2();
+
+  TFile file(Form("root/Fit_Ampl/Amplitude_Li_run_%d.root", run_number),"RECREATE");
+
+  std::vector<double> interval;
+  interval = time_measurer(run_number);
+
+  int om_number;
+  double constante;
+  double mean, time, start_time;
+  double mean_error, nevent;
+  double sigma;
+  int pic =0;
+  double Khi2 = 0;
+  int intensity = 0;
+
+  TTree Result_tree("Result_tree","");
+  Result_tree.Branch("om_number", &om_number);
+  Result_tree.Branch("pic", &pic);
+  Result_tree.Branch("Khi2", &Khi2);
+  Result_tree.Branch("constante", &constante);
+  Result_tree.Branch("Amplitude", &mean);
+  Result_tree.Branch("Amplitude_error", &mean_error);
+  Result_tree.Branch("sigma", &sigma);
+  Result_tree.Branch("run_number", &run_number);
+  Result_tree.Branch("intensity", &intensity);
+  Result_tree.Branch("time", &start_time);
+  Result_tree.Branch("nevent", &nevent);
+
+
+  int debut = 0;
+  TCanvas* canvas = new TCanvas;
+  TFile *tree_file = new TFile (Form("histo_brut/Li_system_%d.root", run_number), "READ");
+
+  double charge_tree;
+  double amplitude_tree;
+  TTree* tree = (TTree*)tree_file->Get("Result_tree");
+  gROOT->cd();
+  tree->SetBranchStatus("*",0);
+  tree->SetBranchStatus("om_number",1);
+  tree->SetBranchAddress("om_number", &om_number);
+  tree->SetBranchStatus("time",1);
+  tree->SetBranchAddress("time", &time);
+  tree->SetBranchStatus("charge_tree",1);
+  tree->SetBranchAddress("charge_tree", &charge_tree);
+  tree->SetBranchStatus("amplitude_tree",1);
+  tree->SetBranchAddress("amplitude_tree", &amplitude_tree);
+
+  TParameter<double> *param = new TParameter<double>("start_time", time);
+  param = (TParameter<double>*)(tree_file->Get("start_time"));
+  start_time = param->GetVal();
+  std::cout << "time = " << start_time << '\n';
+  gROOT->cd();
+
+  for(int om = 0; om < 712; om++)
+  {
+    if ((om > 259 && om < 520) || (om > 583 && om < 647) || (om > 679 && om < 712) ) {debut = debut + (interval.size()/2);}
+    for (double j = debut; j < debut + (interval.size()/2); j++)
+    {
+      TH1D *spectre = new TH1D ("spectre_amplitude", "", 700, 0, 2300 );
+      tree->Project("spectre_amplitude", Form("amplitude_tree*%f", correction_gain_table[bundle_number(om)]), Form("om_number == %d && time > %f && time < %f && amplitude_tree > 10", om, interval.at(j), interval.at(j+1)));
+
+      std::cout << "temps = " << interval.at(j) << " - " << interval.at(j+1) << '\n';
+      if (spectre->GetEntries() < 300) {
+        std::cout << "" << '\n';
+        std::cout << "trop peu d'entries pour l'OM " << om << '\n';
+        std::cout << "" << '\n';
+        pic = j;
+        Khi2 = 0;
+        om_number = om;
+        mean = 0;
+        mean_error = 0;
+        if (om > 711 && run_number < 837) {
+          om_number = om-88;
+        }
+        Result_tree.Fill();
+        delete spectre;
+      }
+      else if (spectre->GetMean() > 1900) {
+        std::cout << "" << '\n';
+        std::cout << "the amplitude sature" << '\n';
+        std::cout << "" << '\n';
+        pic = j;
+        Khi2 = 0;
+        om_number = om;
+        mean = 0;
+        mean_error = 0;
+        if (om > 711 && run_number < 837) {
+          om_number = om-88;
+        }
+        Result_tree.Fill();
+        delete spectre;
+      }
+      else if (spectre->GetMean() < 20){
+        std::cout << "" << '\n';
+        std::cout << "too few charge" << '\n';
+        std::cout << "" << '\n';
+        pic = j;
+        Khi2 = 0;
+        om_number = om;
+        mean = 0;
+        mean_error = 0;
+        if (om > 711 && run_number < 837) {
+          om_number = om-88;
+        }
+        Result_tree.Fill();
+        delete spectre;
+      }
+      else{
+        nevent = spectre->Integral();
+        TF1 *f_Gaus = new TF1("f_Gaus", "gaus(0)", 0, 1200);
+        f_Gaus->SetParNames("N_evt","mean_charge","Sigma");
+        // f_Gaus->SetParameters(25, spectre->GetMean(), 100);
+        f_Gaus->SetParameters(25, spectre->GetMean(), spectre->GetRMS());
+        f_Gaus->SetRange(spectre->GetMean()-400, spectre->GetMean()+400);
+        f_Gaus->Draw("same");
+        spectre->Fit(f_Gaus, "RQ0");
+        f_Gaus->SetRange(f_Gaus->GetParameter(1)-2.5*f_Gaus->GetParameter(2),f_Gaus->GetParameter(1)+5*f_Gaus->GetParameter(2));
+        spectre->Fit(f_Gaus, "RQ0");
+        f_Gaus->SetRange(f_Gaus->GetParameter(1)-2.5*f_Gaus->GetParameter(2),f_Gaus->GetParameter(1)+5*f_Gaus->GetParameter(2));
+        spectre->Fit(f_Gaus, "RQ0");
+
+        pic = j;
+        if (run > 873) pic = j+1;
+        Khi2 = f_Gaus->GetChisquare()/f_Gaus->GetNDF();
+        om_number = om;
+        constante = (f_Gaus->GetParameter(0));
+        mean = (f_Gaus->GetParameter(1));
+        sigma = (f_Gaus->GetParameter(2));
+        mean_error = f_Gaus->GetParError(1) ;
+        intensity = intensity_chooser(pic);
+        spectre->Draw();
+        f_Gaus->Draw("same");
+        std::cout << "/* message */" << '\n';
+        canvas->SaveAs(Form("fit/fit_Li/amplitude_fit/om_%d/OM_%03d_pic_%d_run_%d.png", om, pic, om_number, run_number));
+
+        Result_tree.Fill();
+
+        delete spectre;
+        delete f_Gaus;
+      }
+    }
+  }
+  std::cout << "time = " << start_time << '\n';
+
+  file.cd();
+  Result_tree.Write();
+  file.Close();
+  return;
+}
+
+void fit_LI_amplitude_Ref(int run_number, double *ref_gain_table){
+  gStyle->SetOptFit(1);
+  gStyle->SetOptStat(1);
+  TH1::SetDefaultSumw2();
+  TH2::SetDefaultSumw2();
+
+  TFile file(Form("root/Fit_Ampl_Ref/Amplitude_Li_run_%d.root", run_number),"RECREATE");
+
+  std::vector<double> interval;
+  interval = time_measurer(run_number);
+
+  // for (size_t i = 0; i < interval.size(); i++) {
+  //   std::cout << "interval[" << i << "] = " << interval.at(i) << '\n';
+  // }
+  // return;
+
+  int om_number;
+  double constante;
+  double mean, time, start_time;
+  double mean_error, nevent;
+  double sigma;
+  int pic =0;
+  double Khi2 = 0;
+  int intensity = 0;
+  string wall = "IT";
+  TTree Result_tree("Result_tree","");
+  Result_tree.Branch("om_number", &om_number);
+  Result_tree.Branch("pic", &pic);
+  Result_tree.Branch("Khi2", &Khi2);
+  Result_tree.Branch("constante", &constante);
+  Result_tree.Branch("Amplitude", &mean);
+  Result_tree.Branch("Amplitude_error", &mean_error);
+  Result_tree.Branch("sigma", &sigma);
+  Result_tree.Branch("run_number", &run_number);
+  Result_tree.Branch("intensity", &intensity);
+  Result_tree.Branch("time", &start_time);
+  Result_tree.Branch("nevent", &nevent);
+  Result_tree.Branch("wall", &wall);
+
+  int debut = 0;
+  TCanvas* canvas = new TCanvas;
+  TFile *tree_file = new TFile (Form("histo_brut/Li_system_%d.root", run_number), "READ");
+  double charge_tree;
+  double amplitude_tree;
+  TTree* tree = (TTree*)tree_file->Get("Result_tree");
+  gROOT->cd();
+  tree->SetBranchStatus("*",0);
+  tree->SetBranchStatus("om_number",1);
+  tree->SetBranchAddress("om_number", &om_number);
+  tree->SetBranchStatus("time",1);
+  tree->SetBranchAddress("time", &time);
+  tree->SetBranchStatus("charge_tree",1);
+  tree->SetBranchAddress("charge_tree", &charge_tree);
+  tree->SetBranchStatus("amplitude_tree",1);
+  tree->SetBranchAddress("amplitude_tree", &amplitude_tree);
+
+
+  TParameter<double> *param = new TParameter<double>("start_time", time);
+  param = (TParameter<double>*)(tree_file->Get("start_time"));
+  start_time = param->GetVal();
+  std::cout << "time = " << start_time << '\n';
+  gROOT->cd();
+
+  int number = 800;
+  if (run_number > 836) {
+    number = 712;
+  }
+  if (run_number > 873) {
+    pic = 1;
+  }
+  for(int om = number; om < number + 5; om+=1)
+  {
+
+    for (double j = debut; j < debut + (interval.size()); j++)
+    {
+      if (j > debut + (interval.size()/2)) {
+        wall = "FR";
+      }
+      TH1D *spectre = new TH1D ("spectre_amplitude", "", 700, 0, 2300 );
+      std::cout << "j = " << j << '\n';
+      if (j < debut + 11) tree->Project("spectre_amplitude", Form("amplitude_tree*%f", ref_gain_table[om - number]), Form("om_number == %d && time > %f && time < %f && amplitude_tree > 10", om, interval.at(j), interval.at(j+1)));
+      else tree->Project("spectre_amplitude", Form("amplitude_tree*%f", ref_gain_table[om - number]), Form("om_number == %d && time > %f && time < 2000 && amplitude_tree > 10", om, interval.at(j)));
+      std::cout << "ref_gain = " << ref_gain_table[om-712] << '\n';
+
+      // std::cout << "temps = " << interval.at(j) << " - " << interval.at(j+1) << '\n';
+      if (spectre->GetEntries() < 300) {
+        std::cout << "" << '\n';
+        std::cout << "trop peu d'entries pour l'OM " << om << '\n';
+        std::cout << "" << '\n';
+        pic = j;
+        Khi2 = 0;
+        om_number = om;
+        mean = 0;
+        mean_error = 0;
+        if (om > 711 && run_number < 837) {
+          om_number = om-88;
+        }
+        Result_tree.Fill();
+        delete spectre;
+      }
+      else if (spectre->GetMean() > 1900) {
+        std::cout << "" << '\n';
+        std::cout << "the amplitude sature" << '\n';
+        std::cout << "" << '\n';
+        pic = j;
+        Khi2 = 0;
+        om_number = om;
+        mean = 0;
+        mean_error = 0;
+        if (om > 711 && run_number < 837) {
+          om_number = om-88;
+        }
+        Result_tree.Fill();
+        delete spectre;
+      }
+      else if (spectre->GetMean() < 20){
+        std::cout << "" << '\n';
+        std::cout << "too few charge" << '\n';
+        std::cout << "" << '\n';
+        pic = j;
+        Khi2 = 0;
+        om_number = om;
+        mean = 0;
+        mean_error = 0;
+        if (om > 711 && run_number < 837) {
+          om_number = om-88;
+        }
+        Result_tree.Fill();
+        delete spectre;
+      }
+      else{
+        nevent = spectre->Integral();
+        TF1 *f_Gaus = new TF1("f_Gaus", "gaus(0)", 0, 1200);
+        f_Gaus->SetParNames("N_evt","mean_charge","Sigma");
+        // f_Gaus->SetParameters(25, spectre->GetMean(), 100);
+        f_Gaus->SetParameters(25, spectre->GetMean(), spectre->GetRMS());
+        f_Gaus->SetRange(spectre->GetMean()-400, spectre->GetMean()+400);
+        f_Gaus->Draw("same");
+        spectre->Fit(f_Gaus, "RQ0");
+        f_Gaus->SetRange(f_Gaus->GetParameter(1)-2.5*f_Gaus->GetParameter(2),f_Gaus->GetParameter(1)+5*f_Gaus->GetParameter(2));
+        spectre->Fit(f_Gaus, "RQ0");
+        f_Gaus->SetRange(f_Gaus->GetParameter(1)-2.5*f_Gaus->GetParameter(2),f_Gaus->GetParameter(1)+5*f_Gaus->GetParameter(2));
+        spectre->Fit(f_Gaus, "RQ0");
+
+        pic = j;
+        if (run > 873) pic = j+1;
+        Khi2 = f_Gaus->GetChisquare()/f_Gaus->GetNDF();
+        om_number = om;
+        constante = (f_Gaus->GetParameter(0));
+        mean = (f_Gaus->GetParameter(1));
+        sigma = (f_Gaus->GetParameter(2));
+        mean_error = f_Gaus->GetParError(1) ;
+        intensity = intensity_chooser(pic);
+        spectre->Draw();
+        f_Gaus->Draw("same");
+
+        if (om < 712) {
+          canvas->SaveAs(Form("fit/fit_Li/amplitude_fit/om_%d/OM_%03d_pic_%d_run_%d.png", om, pic, om_number, run_number));
+        }
+        if (om > 711 && run_number < 837) {
+          canvas->SaveAs(Form("fit/fit_Li/amplitude_fit_ref/om_%d/OM_%03d_pic_%d_run_%d.png", om-88, om -88, pic, run_number));
+          om_number = om-88;
+        }
+        if (om > 711 && run_number > 836) {
+          canvas->SaveAs(Form("fit/fit_Li/amplitude_fit_ref/om_%d/OM_%03d_pic_%d_run_%d.png", om, om, pic, run_number));
+        }
+        Result_tree.Fill();
+
+        delete spectre;
+        delete f_Gaus;
+      }
+    }
+  }
+  std::cout << "time = " << start_time << '\n';
+
+  file.cd();
+  Result_tree.Write();
+  file.Close();
+  return;
+}
+
+void file_merger(std::vector<int> run, int ref = 0, string addfile = "") {
   double Amplitude, Amplitude_error, Khi2, time;
   int om_number, run_number, pic;
+
+  string filename = "";
+  if (ref == 1) filename = "_Ref";
 
   TTree Result_tree("Result_tree","");
   Result_tree.Branch("om_number", &om_number);
@@ -672,7 +701,7 @@ void file_merger(std::vector<int> run, string addfile = "") {
   Result_tree.Branch("time", &time);
 
   for (int j = 0; j < run.size(); j++) {
-    TFile *file1 = new TFile(Form("root/Fit_Ampl/Amplitude_Li_run_%d.root", run[j]), "READ");
+    TFile *file1 = new TFile(Form("root/Fit_Ampl%s/Amplitude_Li_run_%d.root", filename.c_str(), run[j]), "READ");
     TTree* tree = (TTree*)file1->Get("Result_tree");
     tree->SetBranchStatus("*",0);
     tree->SetBranchStatus("om_number",1);
@@ -727,7 +756,8 @@ void file_merger(std::vector<int> run, string addfile = "") {
     file1->Close();
   }
 
-  TFile *newfile = new TFile("root/Merged/fit_total.root", "RECREATE");
+  TFile *newfile = new TFile(Form("root/Fit_Ampl%s/Merged_Fit.root", filename.c_str()), "RECREATE");
+  std::cout << "file saved : " << Form("root/Fit_Ampl%s/Merged_Fit.root", filename.c_str())<< '\n';
   newfile->cd();
   Result_tree.Write();
   newfile->Close();
@@ -762,8 +792,8 @@ void TGrapher(std::string file_name, int n_run) {
   double xaxis[n_run];
   double xaxis_error[n_run];
 
-  int jmin = 712;
-  int jmax =717;
+  int jmin = 0;
+  int jmax =712;
   double Ampl_ref, Ampl_ref_error;
   file.cd();
   for (int j = jmin; j < jmax; j++){
@@ -1047,7 +1077,7 @@ int main(int argc, char const *argv[]){
   int n_run, run;
   std::vector<int> run_number, ref_run_number, ref_time;
   int compteur = 0;
-  string file, correction;
+  string file, ref_correction, calo_correction;
   bool add = false;
 
   for(int i = 0; i<argc; i++){
@@ -1068,12 +1098,14 @@ int main(int argc, char const *argv[]){
     }
   }
 
-  std::cout << "Correction file name ?" << '\n';
-  std::cin >> correction;
+  std::cout << "Ref Correction file name ?" << '\n';
+  std::cin >> ref_correction;
+  std::cout << "Calo Correction file name ?" << '\n';
+  std::cin >> calo_correction;
 
   double* ref_gain_tab_base = new double[5];
   double* ref_gain_tab = new double[5];
-  Ref_corrector(run_number[0], correction, ref_gain_tab_base);
+  Ref_corrector(run_number[0], ref_correction, ref_gain_tab_base);
   // for (size_t i = 0; i < 5; i++) {
   //   std::cout << "ref = " << ref_gain_tab_base[i] << '\n';
   // }
@@ -1084,27 +1116,39 @@ int main(int argc, char const *argv[]){
   std::cout << "Code start running" << '\n';
 
   for (int i = 0; i < run_number.size(); i++) {
-    Ref_corrector(run_number[i], correction, ref_gain_tab);
+    Ref_corrector(run_number[i], ref_correction, ref_gain_tab);
     if (i > 0) {
       for (int j = 0; j < 5; j++) {
         ref_gain_tab[j] = ref_gain_tab_base[j]/ref_gain_tab[j];
-        std::cout << j << " : % = " << ref_gain_tab_base[j]/ref_gain_tab[j] << " et ref gain = " << ref_gain_tab[j] << " et base = " << ref_gain_tab_base[j] << '\n';
       }
     }
-    std::cout << "ref_gain = " << ref_gain_tab[3] << '\n';
-
-    fit_LI_amplitude(run_number[i], ref_gain_tab);
+    fit_LI_amplitude_Ref(run_number[i], ref_gain_tab);
   }
-  // return 0;
-  // for (int i = 0; i < ref_run_number.size(); i++) {
-  //   fit_ref(ref_run_number[i], ref_time[i]);
-  // }
+  if (add == false) {
+    file_merger(run_number, 1);
+  }
+  else{
+    file_merger(run_number, 1, file);
+  }
+
+  std::cout << "" << '\n';
+  std::cout << "START OF THE CALORIMETER FIT" << '\n';
+  std::cout << "" << '\n';
+
+  double* gain_tab = new double[10];
+  for (int i = 0; i < run_number.size(); i++) {
+    Li_corrector(run_number[i], calo_correction, gain_tab, run_number[0]);
+    fit_LI_amplitude(run_number[i], gain_tab);
+  }
   if (add == false) {
     file_merger(run_number);
   }
   else{
-    file_merger(run_number, file);
+    file_merger(run_number, 0, file);
   }
+
+  TGrapher("Merged_Fit", n_run);
+
 
 
   // amplitude_variation(run_number, time);
