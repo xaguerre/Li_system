@@ -695,7 +695,7 @@ int main(int argc, char const *argv[]) {
     // file_merger(run_number, old_run);
     std::cout << "file_merger ok" << '\n';
 
-    TGrapher(Form("Fit_ref_716-%d.root", run_number.at(run_number.size()-1)), n_run);
+    TGrapher(Form("Fit_ref_716-%d", run_number.at(run_number.size()-1)), n_run);
 
   }
 
@@ -712,15 +712,15 @@ int main(int argc, char const *argv[]) {
       }
     }
     std::cout << "Code start running" << '\n';
-    for (int i = 0; i < n_run; i++) {
-      Fit_Ref(run_number.at(i));
-      minerror_calculator(Form("Fit_Ref_%d", run_number.at(i)), run_number.at(i));
-    }
+    // for (int i = 0; i < n_run; i++) {
+    //   // Fit_Ref(run_number.at(i));
+    //   minerror_calculator(Form("Fit_Ref_%d", run_number.at(i)), run_number.at(i));
+    // }
     std::cout << "Fit_Ref and minerror ok" << '\n';
-
+//
     file_merger(run_number);
     std::cout << "file_merger ok" << '\n';
-
+//
     TGrapher(Form("Fit_Ref_%d-%d", run_number.at(0), run_number.at(run_number.size()-1)), n_run+1);
   }
   std::cout << "Finish !!!" << '\n';

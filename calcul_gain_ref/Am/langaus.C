@@ -37,7 +37,7 @@ TH1D* charge_spectre_template = NULL;
 void Load_spectre(int run_number){
   TFile *file = new TFile(Form("../histo_brut/histo_ref_%d.root", run_number), "READ");
   gROOT->cd();
-  charge_spectre = (TH2F*)file->Get("histo_pm_charge");
+  charge_spectre = (TH2F*)file->Get("histo_pm_charge_50");
   return;
 }
 
@@ -130,7 +130,7 @@ void langaus(int run_number) {
   TCanvas* canvas = new TCanvas;
   TF1 *f_langaus = new TF1 ("f_langaus", langau_func, 6000, 10000, 6);
   // f_langaus->SetParameters(240, 8700, 5.4e8, 600, 3.3e5, 6300);
-  f_langaus->SetParameters(240, 8700, 3e7, 600, 3.3e5, 6300);
+  f_langaus->SetParameters(240, 8700, 1.5e7, 600, 10000, 6300);
 
   // spectre_om->Draw();
   // f_langaus->Draw();

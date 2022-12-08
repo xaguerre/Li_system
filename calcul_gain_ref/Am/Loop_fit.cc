@@ -77,7 +77,7 @@ const double gain_bin_max = 1.5;
 const double gain_bin_width = (gain_bin_max-gain_bin_min)/(gain_n_bin-1);
 
 void Load_spectre(int run_number){
-  TFile *file = new TFile(Form("../histo_brut/histo_ref_%d_bin.root", run_number), "READ");
+  TFile *file = new TFile(Form("../histo_brut/histo_ref_%d.root", run_number), "READ");
   gROOT->cd();
   charge_spectre = (TH2F*)file->Get("histo_pm_charge");
   return;
@@ -414,7 +414,7 @@ void file_merger(std::vector<int> run_number) {
 
   for (int i = 0; i < run_number.size(); i++) {
     TFile tree_file(Form("fit/fit_templ/Best_Fit/Fit_Ref_%d_mini.root", run_number.at(i)), "READ");
-    // std::cout << run_number.at(i) << '\n';
+    std::cout << run_number.at(i) << '\n';
     TTree* tree = (TTree*)tree_file.Get("Result_tree");
     tree->SetBranchStatus("*",0);
     tree->SetBranchStatus("om_number",1);
@@ -427,105 +427,23 @@ void file_merger(std::vector<int> run_number) {
     tree->SetBranchAddress("error_moins", &gain_error_moins);
     tree->SetBranchStatus("error_plus",1);
     tree->SetBranchAddress("error_plus", &gain_error_plus);
-    tree->SetBranchStatus("run_number",1);
-    tree->SetBranchAddress("run_number", &int_run);
     tree->SetBranchStatus("ndf",1);
     tree->SetBranchAddress("ndf", &ndf);
     tree->SetBranchStatus("time",1);
     tree->SetBranchAddress("time", &time);
 
     int_run = run_number.at(i);
-    std::cout << "ok" << i+1 << '\n';
-    for (int j = 0; j < 1; j++) {
-      tree->GetEntry(j);
-      if (j = 0)correction = gainmin-1;
-      gainmin = gainmin - correction;
-      Result_tree.Fill();
-    }
+    std::cout << "ok " << i+1 << '\n';
+    tree->GetEntry(0);
+    if (i == 0)correction = gain-1;
+    std::cout << "correction = " << correction << " and gain = " << gain << '\n';
+    gain = gain - correction;
+    Result_tree.Fill();
   }
   file.cd();
   Result_tree.Write();
   file.Close();
 }
-
-// void TGrapher(std::string file_name, int n_run) {
-//   std::cout << "ok" << '\n';
-//   TFile file(Form("fit/fit_templ/TGraph/TGraph_%s.root", file_name.c_str()), "RECREATE");
-//
-//   TFile tree_file(Form("fit/fit_templ//Merged_Fit/%s.root", file_name.c_str()), "READ");
-//   double time;
-//   int om_number, run_number;
-//   double gain;
-//   double gain_error_moins, gain_error_plus;
-//   TTree* tree = (TTree*)tree_file.Get("Result_tree");
-//   tree->SetBranchStatus("*",0);
-//   tree->SetBranchStatus("om_number",1);
-//   tree->SetBranchAddress("om_number", &om_number);
-//   tree->SetBranchStatus("gain",1);
-//   tree->SetBranchAddress("gain", &gain);
-//   tree->SetBranchStatus("gain_error_moins",1);
-//   tree->SetBranchAddress("gain_error_moins", &gain_error_moins);
-//   tree->SetBranchStatus("gain_error_plus",1);
-//   tree->SetBranchAddress("gain_error_plus", &gain_error_plus);
-//   tree->SetBranchStatus("run_number",1);
-//   tree->SetBranchAddress("run_number", &run_number);
-//   tree->SetBranchStatus("time",1);
-//   tree->SetBranchAddress("time", &time);
-//
-//   double yaxis[n_run];
-//   double yaxis_error_moins[n_run];
-//   double yaxis_error_plus[n_run];
-//   double xaxis[n_run];
-//   double xaxis_error_moins[n_run];
-//   double xaxis_error_plus[n_run];
-//   auto canvas = new TCanvas("Allfit","",1600,800);
-//   canvas->Divide(3,2);
-//   TGraphAsymmErrors *gain_graph[5]; //(n_run, xaxis, yaxis, xaxis_error_moins, xaxis_error_plus, yaxis_error_moins, yaxis_error_plus);
-//
-//   file.cd();
-//   int compteur = 0;
-//   for (int i = 0; i < 5; i++) {
-//     for (int j = 0; j < n_run; j++){
-//       tree->GetEntry(i+j*5);
-//       compteur++;
-//       // std::cout << "compteur " << i+j*5 << " and om = " << om_number << " and run = " << run_number << '\n';
-//       // std::cout << gain << '\n';
-//       yaxis[j] = gain;
-//       yaxis_error_moins[j] = gain_error_moins;
-//       yaxis_error_plus[j] = gain_error_plus;
-//       xaxis[j] = time;
-//       xaxis_error_plus[j] = 0.00001;
-//       xaxis_error_moins[j] = 0.00001;
-//     }
-//     // for (size_t k = 0; k < n_run; k++) {
-//     //   std::cout << yaxis[k] << '\n';
-//     // }
-//     gain_graph[i] = new TGraphAsymmErrors(n_run, xaxis, yaxis, xaxis_error_moins, xaxis_error_plus, yaxis_error_moins, yaxis_error_plus);
-//
-//     gain_graph[i]->SetName(Form("fit_OM_ref_%d", om_number));
-//     gain_graph[i]->SetNameTitle(Form("fit_OM_ref_%d", om_number), Form("Gain evolution of the OM %d with regard to the background", om_number));
-//     gain_graph[i]->GetXaxis()->SetTimeDisplay(1);
-//     gain_graph[i]->GetXaxis()->SetTitle("Time");
-//     gain_graph[i]->GetYaxis()->SetTitle("Gain evolution");
-//     gain_graph[i]->GetYaxis()->SetRangeUser(0.9, 1.1);
-//     gain_graph[i]->SetMarkerColor(2);
-//     gain_graph[i]->SetMarkerStyle(5);
-//     gain_graph[i]->SetMarkerSize(2);
-//     canvas->cd(i+1);
-//     gain_graph[i]->Draw("AP");
-//
-//     gain_graph[i]->Write();
-//     canvas->Update();
-//     // if (i == 4) {
-//     //   canvas->Write();
-//     // }
-//   }
-//
-//   canvas->Update();
-//   canvas->Write();
-//   file.Close();
-//
-// }
 
 int main(int argc, char const *argv[]) {
   int n_run, run;
@@ -545,17 +463,16 @@ int main(int argc, char const *argv[]) {
   }
 
   std::cout << "Code start running" << '\n';
+  Fit_Ref(run_number.at(n_run - 1));
   for (int i = 0; i < n_run; i++) {
-    Fit_Ref(run_number.at(i));
+    // Fit_Ref(run_number.at(i));
     minerror_calculator(Form("Fit_Ref_%d", run_number.at(i)), run_number.at(i));
-    run_number.push_back(run_number.at(i));
   }
+
   std::cout << "Fit_Ref and minerror ok" << '\n';
 
   file_merger(run_number);
   std::cout << "file_merger ok" << '\n';
-
-  // TGrapher(Form("Fit_Ref_%d-%d", 937, 937), 1);
 
   std::cout << "Finish !!!" << '\n';
   return 0;
