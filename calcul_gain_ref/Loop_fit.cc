@@ -144,9 +144,9 @@ double roofitter(TH1D* modele, TH1D* spectre_om, int om_number, double *rootab, 
   l.SetTextFont(40);
   l.DrawLatex(90000, 80, Form("Khi2 = %.2f", Chi2));
   // return *rootab;
-  if (Chi2 < 3000) {
+  // if (Chi2 < 10000) {
     can->SaveAs(Form("fit/om_%d/run_%d/fit_run_%d_om_%d_gain_%f.png", om_number, run_number, run_number, om_number, gain));
-  }
+  // }
 
 
   delete miniChi;
@@ -184,7 +184,6 @@ void Fit_Ref(int run_number) {
     TH1D* spectre_om = NULL;
     spectre_om = spectre_charge(om_number);
     TFile *file = new TFile(Form("histo_brut/histo_ref_%d.root", run_number), "READ");
-    // std::cout << Form("histo_brut/histo_ref_%d.root", run_number) << '\n';
     // spectre_om = (TH1D*)file->Get("histo_pm_charge");
 
     time = 0;
@@ -313,7 +312,7 @@ void minerror_calculator(string file_name, int run_number) {
   Result_tree.Branch("PolChi2", &PolChi2);
   Result_tree.Branch("gainmin", &gainmin);
   Result_tree.Branch("chi2min", &chi2min);
-  Result_tree.Branch("nsrun", &nsrun);
+  Result_tree.Branch("run_number", &run_number);
   Result_tree.Branch("error_moins", &error_moins);
   Result_tree.Branch("error_plus", &error_plus);
   Result_tree.Branch("mingain_tree", &mingain_tree);
@@ -328,8 +327,8 @@ void minerror_calculator(string file_name, int run_number) {
   tree->SetBranchAddress("Chi2", &Chi2);
   tree->SetBranchStatus("gain",1);
   tree->SetBranchAddress("gain", &gain);
-  tree->SetBranchStatus("nsrun",1);
-  tree->SetBranchAddress("nsrun", &nsrun);
+  tree->SetBranchStatus("run_number",1);
+  tree->SetBranchAddress("run_number", &run_number);
   tree->SetBranchStatus("ndf",1);
   tree->SetBranchAddress("ndf", &ndf);
   tree->SetBranchStatus("time",1);
@@ -339,9 +338,8 @@ void minerror_calculator(string file_name, int run_number) {
   TFile newfile(Form("root/Best_Fit/%s_mini.root", file_name.c_str()), "RECREATE");
   gROOT->cd();
 
-  for (i = 712; i < 717; i++) {
-
-    minChi2 = 10000;
+  for (i = 712; i < 713; i++) {
+    minChi2 = 100000;
     for (int j = 0; j < tree->GetEntries(); j++) {
       tree->GetEntry(j);
       if (om_number == i) {
@@ -357,16 +355,21 @@ void minerror_calculator(string file_name, int run_number) {
     TF1* poly = new TF1 ("poly", "pol2", gainmin - 0.01, gainmin + 0.01);
     std::cout << "gainmin = " << gainmin << '\n';
 
-    TH2D *Chi2gain = new TH2D ("Chi2gain", "", 1000, gainmin - 0.1, gainmin + 0.1, 1000, 0, 1000);
+    TH2D *Chi2gain = new TH2D ("Chi2gain", "Chi2gain", 1000, gainmin - 0.1, gainmin + 0.1, 10000, 0, 100000);
+
+    for (int j = 0; j < tree->GetEntries(); j++) {
+      tree->GetEntry(j);
+      if (om_number == i) {
+          Chi2gain->Fill(gain,Chi2);
+      }
+    }
     if (run_number == 789) {
       Chi2gain->GetYaxis()->SetRangeUser(800,3000);
     }
-    tree->Project("Chi2gain", "Chi2:gain", Form("om_number == %d", i));
 
     TCanvas* can = new TCanvas;
     can->cd();
     Chi2gain->Draw();
-
     poly->Draw("same");
     Chi2gain->Fit(poly, "RQ");
     PolChi2 = poly->GetChisquare();
@@ -376,6 +379,7 @@ void minerror_calculator(string file_name, int run_number) {
     error_moins = poly->GetMinimumX() - poly->GetX(poly->GetMinimum()+1, poly->GetMinimumX() - 0.05, poly->GetMinimumX());
     std::cout << "min = " << poly->GetMinimum() << " ; " << poly->GetMinimumX() << " + " << error_plus << " - " << error_moins << '\n';
     std::cout << "Chi2 = " << PolChi2 << '\n';
+    // return;
     can->SaveAs(Form("fit/om_%d/run_%d/fit_Chi2_gain.png", i, run_number));
 
     Result_tree.Fill();
@@ -440,15 +444,15 @@ void file_merger(std::vector<int> run_number, string previous_file_s = "") {
       om_number = i;
       Chi2 = 0;
       gain = 1;
-      gain_error_moins = 0;
-      gain_error_plus = 0;
+      gain_error_moins = 0.0009755;
+      gain_error_plus = 0.0009755;
       int_run = 716;
       time = 1655219940;
       Result_tree.Fill();
     }
   }
 
-  for (int i = 0; i < run_number.size()-1; i++) {
+  for (int i = 0; i < run_number.size(); i++) {
     TFile tree_file(Form("root/Best_Fit/Fit_Ref_%d_mini.root", run_number.at(i)), "READ");
     // std::cout << run_number.at(i) << '\n';
     TTree* tree = (TTree*)tree_file.Get("Result_tree");
@@ -472,7 +476,7 @@ void file_merger(std::vector<int> run_number, string previous_file_s = "") {
 
     int_run = run_number.at(i);
     std::cout << "ok" << i+1 << '\n';
-    for (int j = 0; j < 5; j++) {
+    for (int j = 0; j < 1; j++) {
       tree->GetEntry(j);
       Result_tree.Fill();
     }
@@ -652,7 +656,6 @@ void comparator(int om){
 }
 
 
-
 int main(int argc, char const *argv[]) {
   int n_run, run;
   std::vector<int> run_number, time, ref_run_number, ref_time;
@@ -687,19 +690,17 @@ int main(int argc, char const *argv[]) {
     std::cout << "Code start running" << '\n';
 
     for (int i = 0; i < n_run; i++) {
-      // Fit_Ref(run_number.at(i));
-      // minerror_calculator(Form("Fit_Ref_%d", run_number.at(i)), run_number.at(i));
+      Fit_Ref(run_number.at(i));
+      minerror_calculator(Form("Fit_Ref_%d", run_number.at(i)), run_number.at(i));
     }
     std::cout << "Fit_Ref ok and minerror ok" << '\n';
 
-    // file_merger(run_number, old_run);
+    file_merger(run_number, old_run);
     std::cout << "file_merger ok" << '\n';
 
     TGrapher(Form("Fit_ref_716-%d", run_number.at(run_number.size()-1)), n_run);
 
   }
-
-
   else {                            ///// Create new file
     std::cout << "How many run do you want ?" << '\n';
     std::cin >> n_run;
@@ -712,10 +713,11 @@ int main(int argc, char const *argv[]) {
       }
     }
     std::cout << "Code start running" << '\n';
-    // for (int i = 0; i < n_run; i++) {
-    //   // Fit_Ref(run_number.at(i));
-    //   minerror_calculator(Form("Fit_Ref_%d", run_number.at(i)), run_number.at(i));
-    // }
+    for (int i = 0; i < n_run; i++) {
+      Fit_Ref(run_number.at(i));
+      cout << Form("Fit_Ref_%d", run_number.at(i)) << endl;
+      minerror_calculator(Form("Fit_Ref_%d", run_number.at(i)), run_number.at(i));
+    }
     std::cout << "Fit_Ref and minerror ok" << '\n';
 //
     file_merger(run_number);
