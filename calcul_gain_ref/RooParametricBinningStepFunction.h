@@ -1,7 +1,7 @@
 /*****************************************************************************
 * Authors: Xalbat Aguerre and Loic Labit
-* Modification of RooParametricStepFunction to allow modification of the 
-* binning  					
+* Modification of RooParametricStepFunction to allow modification of the
+* binning
 *
 * Project: RooFit                                                           *
 * Package: RooFitModels                                                     *

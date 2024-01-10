@@ -80,17 +80,6 @@ TH1D* spectre_charge_full(int om_number){
 
 }
 
-TH1D* spectre_charge_ful(int om_number){
-
-  TFile *file = new TFile(Form("histo_brut/histo_Li_system_714.root", run_number), "READ");
-
-  TH1D* spectre_charge = charge_spectre->ProjectionY(Form("charge%03d",om_number), om_number+1, om_number+1);
-  // spectre_charge->Rebin(4);
-  return spectre_charge;
-
-}
-
-
 void Load_spectre_template(){
   TFile *file = new TFile("histo_brut/histo_ref_716.root", "READ");
   gROOT->cd();
@@ -215,73 +204,6 @@ void Fit_Ref(int run_number) {
 
   TH1D* modele = NULL;
 
-  TFile tree_file(Form("histo_brut/Li_system_%d.root", run_number), "READ");
-  gROOT->cd();
-  TTree* tree = (TTree*)tree_file.Get("Result_tree");
-  tree->SetBranchStatus("*",0);
-  tree->SetBranchStatus("om_number",1);
-  tree->SetBranchAddress("om_number", &om_number);
-  tree->SetBranchStatus("time",1);
-  tree->SetBranchAddress("time", &time);
-  tree->SetBranchStatus("charge_tree",1);
-  tree->SetBranchAddress("charge_tree", &charge_tree);
-  tree->SetBranchStatus("amplitude_tree",1);
-  tree->SetBranchAddress("amplitude_tree", &amplitude_tree);
-
-  TTree Result_tree("Result_tree","");
-  Result_tree.Branch("om_number", &om_number);
-  Result_tree.Branch("Chi2", &Chi2);
-  Result_tree.Branch("gain", &gain);
-  Result_tree.Branch("gain_error", &gain_error);
-  Result_tree.Branch("run_number", &run_number);
-
-  for (om_number = 712; om_number < 716; om_number++) {
-
-    modele = spectre_charge_full_template(om_number);
-    // TH1D *spectre_om = new TH1D ("spectre_om", "", 1024, 0, 200000);
-    // tree->Project("spectre_om", "charge_tree", Form("om_number == %d && time < 300 && Entry$ > 120e6 ", om_number+88));
-    TH1D* spectre_om = NULL;
-    spectre_om = spectre_charge_full(om_number);
-
-    for (int i = 0; i < 50; i++) {
-      modele->SetBinContent(i,0);
-      modele->SetBinError(i, 0);
-      spectre_om->SetBinContent(i,0);
-      spectre_om->SetBinError(i, 0);
-    }
-
-    roofitter(modele, spectre_om, om_number, rootab, run_number);
-    Chi2 = rootab[0];
-    gain = rootab[1];
-    gain_error = rootab[2];
-
-
-
-    modele->Reset();
-    Result_tree.Fill();
-    delete spectre_om;
-
-  }
-  TFile new_file(Form("root/Fit_Ref_%d.root", run_number), "RECREATE");
-  new_file.cd();
-  Result_tree.Write();
-  new_file.Close();
-
-  return;
-
-}
-
-void Fit_Ref_714(int run_number) {
-  Load_spectre(run_number);
-  Load_spectre_template();
-  TH1::SetDefaultSumw2();
-
-  double time, charge_tree, amplitude_tree, Chi2, gain, gain_error;
-  int om_number;
-  double* rootab = new double[3];
-
-  TH1D* modele = NULL;
-
   // TFile tree_file(Form("histo_brut/Li_system_%d.root", run_number), "READ");
   // gROOT->cd();
   // TTree* tree = (TTree*)tree_file.Get("Result_tree");
@@ -308,7 +230,7 @@ void Fit_Ref_714(int run_number) {
     // TH1D *spectre_om = new TH1D ("spectre_om", "", 1024, 0, 200000);
     // tree->Project("spectre_om", "charge_tree", Form("om_number == %d && time < 300 && Entry$ > 120e6 ", om_number+88));
     TH1D* spectre_om = NULL;
-    spectre_om = spectre_charge_ful(om_number);
+    spectre_om = spectre_charge_full(om_number);
 
     for (int i = 0; i < 50; i++) {
       modele->SetBinContent(i,0);
@@ -530,6 +452,8 @@ int main(int argc, char const *argv[]) {
     TGrapher(Form("Fit_ref_716-%d.root", run_number.at(run_number.size())), n_run);
 
   }
+
+
   else {                            ///// Create new file
     std::cout << "How many run do you want ?" << '\n';
     std::cin >> n_run;

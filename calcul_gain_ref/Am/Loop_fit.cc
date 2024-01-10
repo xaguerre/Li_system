@@ -138,7 +138,7 @@ double roofitter(TH1D* modele, TH1D* spectre_om, int om_number, double *rootab, 
   rootab[1] = Tl_int;
   rootab[2] = Tl_int_error;
   // rootab[0] = RooChi2.getVal()/(1024. - 1);
-  rootab[0] =Chi2;
+  rootab[0] = Chi2;
   TLatex l;
   l.SetTextFont(40);
   l.DrawLatex(90000, 80, Form("Khi2 = %.2f", Chi2));
@@ -209,7 +209,7 @@ void Fit_Ref(int run_number) {
       modele = TH2modele->ProjectionY("modele", gain_count, gain_count);
       modele->Draw();
       spectre_om->Draw("same");
-      for (int i = 0; i < 61; i++) {
+      for (int i = 0; i < 61; i++) {    // 25 full, 61, part
         modele->SetBinContent(i,0);
         modele->SetBinError(i, 0);
         spectre_om->SetBinContent(i,0);
@@ -463,9 +463,9 @@ int main(int argc, char const *argv[]) {
   }
 
   std::cout << "Code start running" << '\n';
-  Fit_Ref(run_number.at(n_run - 1));
+  // Fit_Ref(run_number.at(n_run - 1));
   for (int i = 0; i < n_run; i++) {
-    // Fit_Ref(run_number.at(i));
+    Fit_Ref(run_number.at(i));
     minerror_calculator(Form("Fit_Ref_%d", run_number.at(i)), run_number.at(i));
   }
 
